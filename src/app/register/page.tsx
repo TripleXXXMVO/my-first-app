@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createClient } from "@/lib/supabase/client";
 import { registerSchema, type RegisterFormValues } from "@/lib/validations/auth";
 import { AuthLayout } from "@/components/auth/AuthLayout";
 import { GoogleOAuthButton } from "@/components/auth/GoogleOAuthButton";
@@ -65,16 +64,16 @@ export default function RegisterPage() {
   const handleResend = async () => {
     setResending(true);
     setResendMessage(null);
-    const supabase = createClient();
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email: form.getValues("email"),
-      options: {
-        emailRedirectTo: `${window.location.origin}/api/auth/callback`,
-      },
+    const response = await fetch("/api/auth/resend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: form.getValues("email"),
+        redirectTo: `${window.location.origin}/api/auth/callback`,
+      }),
     });
     setResending(false);
-    if (error) {
+    if (!response.ok) {
       setResendMessage("Could not resend the email. Please try again.");
     } else {
       setResendMessage("Confirmation email resent! Check your inbox.");

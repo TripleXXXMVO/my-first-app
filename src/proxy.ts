@@ -1,25 +1,17 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { isRateLimited, getClientIp } from "@/lib/rate-limit";
 
 const publicRoutes = ["/login", "/register", "/forgot-password", "/reset-password"];
 
-// Simple in-memory rate limiter for auth POST routes
-// Allows 10 attempts per IP per 15 minutes
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 10;
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-const AUTH_POST_ROUTES = ["/api/auth/login", "/api/auth/register", "/api/auth/forgot-password"];
-
-function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-  entry.count += 1;
-  return entry.count > RATE_LIMIT_MAX;
-}
+// Routes rate-limited to 10 POST requests per IP per 15 minutes
+// NOTE: in-memory store — for multi-instance deployments replace with Redis
+const AUTH_POST_ROUTES = [
+  "/api/auth/login",
+  "/api/auth/register",
+  "/api/auth/forgot-password",
+  "/api/auth/resend",
+];
 
 export async function proxy(request: NextRequest) {
   // Rate limit auth POST routes
@@ -27,7 +19,7 @@ export async function proxy(request: NextRequest) {
     request.method === "POST" &&
     AUTH_POST_ROUTES.some((route) => request.nextUrl.pathname.startsWith(route))
   ) {
-    const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+    const ip = getClientIp(request);
     if (isRateLimited(ip)) {
       return new NextResponse("Too many requests. Please try again later.", {
         status: 429,
