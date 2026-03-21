@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema, type LoginFormValues } from "@/lib/validations/auth";
+import {
+  resetPasswordSchema,
+  type ResetPasswordFormValues,
+} from "@/lib/validations/auth";
 import { AuthLayout } from "@/components/auth/AuthLayout";
-import { GoogleOAuthButton } from "@/components/auth/GoogleOAuthButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,60 +21,82 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 
-export default function LoginPage() {
+export default function ResetPasswordPage() {
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
-  const form = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema),
+  const form = useForm<ResetPasswordFormValues>({
+    resolver: zodResolver(resetPasswordSchema),
     defaultValues: {
-      email: "",
       password: "",
+      confirmPassword: "",
     },
   });
 
-  const onSubmit = async (values: LoginFormValues) => {
+  const onSubmit = async (values: ResetPasswordFormValues) => {
     setServerError(null);
     setLoading(true);
 
-    const response = await fetch("/api/auth/login", {
+    const response = await fetch("/api/auth/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: values.email, password: values.password }),
+      body: JSON.stringify({ password: values.password }),
     });
     const data = await response.json();
 
+    setLoading(false);
+
     if (!response.ok) {
-      setServerError(data.error ?? "Invalid email or password. Please try again.");
-      setLoading(false);
+      setServerError(data.error ?? "Something went wrong. Please try again or request a new reset link.");
       return;
     }
 
-    router.push("/dashboard");
-    router.refresh();
+    setSuccess(true);
   };
+
+  if (success) {
+    return (
+      <AuthLayout
+        title="Password updated"
+        description="Your password has been reset successfully."
+      >
+        <div className="space-y-4 text-center">
+          <Button
+            className="w-full bg-[#B580FF] font-body text-sm font-semibold text-white hover:bg-[#5b57a2]"
+            onClick={() => {
+              router.push("/dashboard");
+              router.refresh();
+            }}
+          >
+            Go to dashboard
+          </Button>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout
-      title="Welcome back"
-      description="Sign in to your HR WORKS account"
+      title="Set a new password"
+      description="Enter your new password below"
     >
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
             control={form.control}
-            name="email"
+            name="password"
             render={({ field }) => (
               <FormItem>
                 <FormLabel className="font-body text-sm text-[#222222]">
-                  Email
+                  New password
                 </FormLabel>
                 <FormControl>
                   <Input
-                    type="email"
-                    placeholder="you@example.com"
-                    autoComplete="email"
+                    type="password"
+                    placeholder="At least 8 characters"
+                    autoComplete="new-password"
                     className="focus-visible:ring-[#B580FF]"
                     {...field}
                   />
@@ -84,25 +108,17 @@ export default function LoginPage() {
 
           <FormField
             control={form.control}
-            name="password"
+            name="confirmPassword"
             render={({ field }) => (
               <FormItem>
-                <div className="flex items-center justify-between">
-                  <FormLabel className="font-body text-sm text-[#222222]">
-                    Password
-                  </FormLabel>
-                  <Link
-                    href="/forgot-password"
-                    className="text-sm font-medium text-[#5b57a2] underline hover:text-[#292673]"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
+                <FormLabel className="font-body text-sm text-[#222222]">
+                  Confirm new password
+                </FormLabel>
                 <FormControl>
                   <Input
                     type="password"
-                    placeholder="Enter your password"
-                    autoComplete="current-password"
+                    placeholder="Re-enter your new password"
+                    autoComplete="new-password"
                     className="focus-visible:ring-[#B580FF]"
                     {...field}
                   />
@@ -113,9 +129,19 @@ export default function LoginPage() {
           />
 
           {serverError && (
-            <p className="text-sm font-medium text-[#FF4F4F]" role="alert">
-              {serverError}
-            </p>
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-[#FF4F4F]" role="alert">
+                {serverError}
+              </p>
+              {serverError.includes("expired") && (
+                <Link
+                  href="/forgot-password"
+                  className="block text-sm font-medium text-[#5b57a2] underline hover:text-[#292673]"
+                >
+                  Request a new reset link
+                </Link>
+              )}
+            </div>
           )}
 
           <Button
@@ -123,29 +149,17 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-[#B580FF] font-body text-sm font-semibold text-white hover:bg-[#5b57a2]"
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? "Updating..." : "Update password"}
           </Button>
         </form>
       </Form>
 
-      {/* Divider */}
-      <div className="my-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-[#DAC0FF]/40" />
-        <span className="font-body text-xs text-[#767676]">OR</span>
-        <div className="h-px flex-1 bg-[#DAC0FF]/40" />
-      </div>
-
-      {/* Google OAuth */}
-      <GoogleOAuthButton label="Sign in with Google" />
-
-      {/* Register link */}
       <p className="mt-6 text-center font-body text-sm text-[#222222]/60">
-        Don&apos;t have an account?{" "}
         <Link
-          href="/register"
+          href="/login"
           className="font-medium text-[#5b57a2] underline hover:text-[#292673]"
         >
-          Sign up
+          Back to sign in
         </Link>
       </p>
     </AuthLayout>

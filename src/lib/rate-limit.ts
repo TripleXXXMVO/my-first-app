@@ -16,5 +16,14 @@ export function isRateLimited(ip: string): boolean {
 }
 
 export function getClientIp(request: NextRequest): string {
-  return request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  // request.ip is set by Next.js/Vercel to the verified real client IP
+  const reqIp = (request as NextRequest & { ip?: string }).ip;
+  if (reqIp) return reqIp;
+  // Fallback: take the last IP in x-forwarded-for (rightmost = added by the outermost trusted proxy)
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const ips = forwarded.split(",").map((s) => s.trim()).filter(Boolean);
+    return ips[ips.length - 1] ?? "unknown";
+  }
+  return "unknown";
 }

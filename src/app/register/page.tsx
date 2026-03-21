@@ -215,7 +215,7 @@ export default function RegisterPage() {
       {/* Divider */}
       <div className="my-6 flex items-center gap-3">
         <div className="h-px flex-1 bg-[#DAC0FF]/40" />
-        <span className="font-body text-xs text-[#222222]/40">OR</span>
+        <span className="font-body text-xs text-[#767676]">OR</span>
         <div className="h-px flex-1 bg-[#DAC0FF]/40" />
       </div>
 
