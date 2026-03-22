@@ -182,19 +182,19 @@ All other auth operations (login, register, logout, password reset) call Supabas
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase anonymous/public key
 - Google OAuth must be configured in Supabase dashboard
 
-## QA Test Results (Full Re-Test #3)
+## QA Test Results (Full Re-Test #4)
 
-**Tested:** 2026-03-21 (Complete re-test of all criteria after bug fix commit 34482fe)
+**Tested:** 2026-03-22 (Complete re-test after bug fix commits c643379 and 21d6a53)
 **App URL:** http://localhost:3000
 **Tester:** QA Engineer (AI)
 **Build Status:** PASS (Next.js 16, compiled successfully, no TypeScript errors)
-**Lint Status:** Not run (requires manual approval)
+**Lint Status:** PASS (ESLint -- no errors)
 
 ---
 
 ### Previous Bug Fix Verification
 
-All bugs from previous QA runs have been re-verified against the current codebase.
+All bugs from previous QA runs (BUG-1 through BUG-18 and BUG-EC1) have been re-verified against the current codebase (commit 54ed34a).
 
 | Bug | Description | Previous Severity | Status |
 |-----|-------------|-------------------|--------|
@@ -202,14 +202,22 @@ All bugs from previous QA runs have been re-verified against the current codebas
 | BUG-2 | No Security Headers | High | FIXED -- `next.config.ts` sets X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS, Permissions-Policy |
 | BUG-3 | Missing .env.local.example | Medium | FIXED -- `.env.local.example` exists with dummy values |
 | BUG-4 | Missing Resend Confirmation Email | Medium | FIXED -- "Resend confirmation email" button on confirmation screen |
-| BUG-5 | No Rate Limiting on Auth Endpoints | High | FIXED -- Auth forms now POST to server-side API routes; proxy rate limiter covers `/api/auth/login`, `/api/auth/register`, `/api/auth/forgot-password` |
-| BUG-5b | Rate Limiting Ineffective (client-side calls) | High | FIXED -- Login and register now use `fetch("/api/auth/...")` server routes, not direct Supabase SDK calls from the browser |
+| BUG-5 | No Rate Limiting on Auth Endpoints | High | FIXED -- Proxy rate limiter covers all auth POST routes |
+| BUG-5b | Rate Limiting Ineffective (client-side calls) | High | FIXED -- All auth forms use `fetch("/api/auth/...")` server routes |
 | BUG-6 | Server-Side Non-Null Assertion | Medium | FIXED -- `server.ts` throws descriptive error on missing env vars |
-| BUG-7 | Password Reset User Enumeration | Medium | FIXED -- `/api/auth/forgot-password` route always returns `{ success: true }` regardless of Supabase error; client always shows success screen |
+| BUG-7 | Password Reset User Enumeration | Medium | FIXED -- `/api/auth/forgot-password` always returns `{ success: true }` |
 | BUG-8 | Home Page Shows Default Template | Low | FIXED -- `/` redirects to `/login` via server-side `redirect()` |
 | BUG-9 | Spec Documents middleware.ts | Low | FIXED -- Spec correctly references `proxy.ts` |
 | BUG-10 | Login Password Min Length | Low | FIXED -- `loginSchema` enforces `min(8)` |
-| BUG-11 | Auth Callback Non-Null Assertion | Low | FIXED -- Callback route now uses runtime guard (lines 22-26) with graceful redirect to `/login` on missing env vars |
+| BUG-11 | Auth Callback Non-Null Assertion | Low | FIXED -- Callback route uses runtime guard with graceful redirect |
+| BUG-12 | Google OAuth Bypasses Rate Limiting | Medium | FIXED -- `GoogleOAuthButton` now POSTs to `/api/auth/google` server route; route is in `AUTH_POST_ROUTES` |
+| BUG-13 | Duplicate Rate Limiter / In-Memory Store | Medium | PARTIALLY FIXED -- Duplicate removed; proxy now imports from `@/lib/rate-limit`. In-memory `Map` limitation acknowledged in comment (line 8 of proxy.ts). Acceptable for MVP single-instance deployment. |
+| BUG-14 | Rate Limiter IP Spoofing | Low | FIXED -- `getClientIp()` now uses `request.ip` first (set by Next.js/Vercel, cannot be spoofed); falls back to rightmost IP in `x-forwarded-for` (outermost trusted proxy) |
+| BUG-15 | Dead Code -- Placeholder supabase.ts | Low | FIXED -- File `src/lib/supabase.ts` has been deleted |
+| BUG-16 | WCAG Color Contrast Issue (40% opacity) | Low | PARTIALLY FIXED -- Changed from `/40` to `/60` opacity. See BUG-19 for remaining concern. |
+| BUG-17 | Resend Bypasses Rate Limiting | Medium | FIXED -- Resend now POSTs to `/api/auth/resend` server route; route is in `AUTH_POST_ROUTES` |
+| BUG-18 | Reset Password Bypasses Rate Limiting | Low | FIXED -- Reset password now POSTs to `/api/auth/reset-password` server route; route is in `AUTH_POST_ROUTES` |
+| BUG-EC1 | Google OAuth Email Distinction | Low | UNCHANGED -- Still generic message. Accepted as impractical without additional DB lookup. |
 
 ---
 
@@ -217,11 +225,12 @@ All bugs from previous QA runs have been re-verified against the current codebas
 
 #### AC-1: User can register with a valid email address and a password (min. 8 characters)
 - [x] Registration form exists at `/register` with email, password, and confirm password fields
-- [x] Zod `registerSchema` enforces minimum 8 characters on password
+- [x] Zod `registerSchema` enforces minimum 8 characters on password (client-side)
 - [x] Form uses `react-hook-form` with `zodResolver` for client-side validation
 - [x] Registration POSTs to `/api/auth/register` server route which calls `supabase.auth.signUp`
 - [x] Server-side input validation checks for required email and password
-- **Result: PASS**
+- [ ] BUG-20: Server-side does NOT validate password minimum length (see Bugs section)
+- **Result: PASS (client-side enforced; see BUG-20 for defense-in-depth gap)**
 
 #### AC-2: Registration fails with a clear error message if the email is already in use
 - [x] Server route (`/api/auth/register`) checks Supabase error for "already", "registered", "exists" keywords
@@ -237,15 +246,15 @@ All bugs from previous QA runs have been re-verified against the current codebas
 #### AC-4: User receives a confirmation email after email/password registration
 - [x] After successful signup, UI transitions to "Check your email" confirmation screen
 - [x] `emailRedirectTo` is passed to Supabase for email link handling
-- [x] "Resend confirmation email" button present, calls `supabase.auth.resend({ type: "signup" })`
+- [x] "Resend confirmation email" button present, POSTs to `/api/auth/resend` server route
 - [x] "Try a different email" button returns to registration form
 - [x] "Back to sign in" link navigates to `/login`
 - **Result: PASS**
 
 #### AC-5: User can sign up and log in via Google OAuth (1-click)
 - [x] `GoogleOAuthButton` component present on both `/login` and `/register` pages
-- [x] Calls `supabase.auth.signInWithOAuth` with provider `"google"`
-- [x] `redirectTo` set to `${window.location.origin}/api/auth/callback`
+- [x] POSTs to `/api/auth/google` which calls `supabase.auth.signInWithOAuth` with `skipBrowserRedirect: true`
+- [x] Returns OAuth URL; client redirects via `window.location.href`
 - [x] Button disabled during loading to prevent double clicks
 - **Result: PASS**
 
@@ -277,7 +286,7 @@ All bugs from previous QA runs have been re-verified against the current codebas
 
 #### AC-10: User can set a new password after clicking the reset link
 - [x] `/reset-password` page with password + confirm password fields
-- [x] Calls `supabase.auth.updateUser({ password })` to set new password
+- [x] POSTs to `/api/auth/reset-password` which calls `supabase.auth.updateUser({ password })`
 - [x] On success, shows "Password updated" with "Go to dashboard" button
 - [x] Handles expired/invalid token with specific message and link to `/forgot-password`
 - [x] Handles "same password" error with specific message
@@ -319,23 +328,23 @@ All bugs from previous QA runs have been re-verified against the current codebas
 - [ ] Registration error does not specifically distinguish Google OAuth-linked emails
 - [x] Generic message "This email is already registered. Try signing in or use Google." partially addresses the intent by mentioning Google
 - **Severity: Low** -- Supabase does not provide a distinct error code for OAuth-linked accounts, making exact detection impractical
-- **Result: PARTIAL PASS**
+- **Result: PARTIAL PASS (unchanged, accepted limitation)**
 
 #### EC-2: Google OAuth flow cancelled by user
-- [x] `GoogleOAuthButton` silently resets loading state on error (no error message shown)
+- [x] `GoogleOAuthButton` silently resets loading state on error (`!response.ok || !data.url` returns early)
 - [x] Matches spec: "Return to login page with no error (silent cancel)"
 - **Result: PASS**
 
 #### EC-3: Password reset link expired
-- [x] Reset password page checks for "expired", "invalid", or "token" in error message
-- [x] Shows: "This reset link has expired or is invalid. Please request a new one."
-- [x] Includes clickable "Request a new reset link" linking to `/forgot-password`
+- [x] Reset password API route checks for "expired", "invalid", or "token" in error message
+- [x] Returns: "This reset link has expired or is invalid. Please request a new one."
+- [x] Client shows error with clickable "Request a new reset link" linking to `/forgot-password`
 - **Result: PASS**
 
 #### EC-4: Registration form submitted multiple times quickly (double-click)
 - [x] Submit button has `disabled={loading}` to prevent double submissions
 - [x] Loading text changes to "Creating account..." during submission
-- [x] Same pattern applied to all auth forms (login: "Signing in...", forgot-password: "Sending...", reset-password: "Updating...")
+- [x] Same pattern applied to all auth forms (login: "Signing in...", forgot-password: "Sending...", reset-password: "Updating...", Google OAuth: "Redirecting...")
 - **Result: PASS**
 
 #### EC-5: Google account email changes after linking
@@ -344,7 +353,7 @@ All bugs from previous QA runs have been re-verified against the current codebas
 
 #### EC-6: Confirmation email not received -- resend option
 - [x] Confirmation screen has "Resend confirmation email" button
-- [x] Uses `supabase.auth.resend({ type: "signup" })` with stored email
+- [x] POSTs to `/api/auth/resend` server route which calls `supabase.auth.resend({ type: "signup" })`
 - [x] Shows success ("Confirmation email resent! Check your inbox.") or error feedback
 - [x] Resend button disabled during operation to prevent double clicks
 - [x] "Try a different email" button as secondary option
@@ -363,12 +372,14 @@ All bugs from previous QA runs have been re-verified against the current codebas
 #### Input Validation
 - [x] Client-side: All forms validated via Zod schemas + react-hook-form
 - [x] Server-side: API routes validate required fields before calling Supabase
+- [ ] BUG-20: Server-side API routes do NOT enforce password minimum length (8 chars) -- only check for presence. A crafted POST request bypassing the browser can register with a short password (see Bugs section)
 - [x] No `dangerouslySetInnerHTML`, `eval()`, `new Function()`, or `innerHTML` usage found anywhere in the codebase
 - [x] React/JSX auto-escapes all rendered output
 
 #### Open Redirect Protection
 - [x] Auth callback `getSafeRedirectPath()` blocks protocol-relative URLs (`//`), URLs with `:`, and non-`/` prefixed values
 - [x] Default redirect is `/dashboard`
+- [ ] BUG-21: Server-side API routes pass client-supplied `redirectTo` URL to Supabase without validation (see Bugs section)
 
 #### Security Headers (next.config.ts)
 - [x] `X-Frame-Options: DENY` -- prevents clickjacking
@@ -380,11 +391,10 @@ All bugs from previous QA runs have been re-verified against the current codebas
 
 #### Rate Limiting
 - [x] Proxy-level rate limiter: 10 requests per IP per 15 minutes on auth POST routes
-- [x] Covers `/api/auth/login`, `/api/auth/register`, `/api/auth/forgot-password`
-- [x] Login and register forms now POST to server API routes (not direct Supabase SDK calls), so rate limiter is effective
-- [ ] BUG-12: Google OAuth button still calls Supabase SDK directly from the browser, bypassing proxy rate limiting (see Bugs section)
-- [ ] BUG-13: In-memory rate limit map is not shared across server instances and resets on server restart (see Bugs section)
-- [ ] BUG-14: Rate limiter uses `x-forwarded-for` header which can be spoofed in some deployment configurations (see Bugs section)
+- [x] Covers all 6 auth endpoints: `/api/auth/login`, `/api/auth/register`, `/api/auth/forgot-password`, `/api/auth/resend`, `/api/auth/google`, `/api/auth/reset-password`
+- [x] All auth actions now go through server API routes (no more direct Supabase SDK calls from browser for auth operations)
+- [x] `getClientIp()` uses `request.ip` first (Vercel-verified), then rightmost `x-forwarded-for` as fallback
+- [x] In-memory store limitation acknowledged in code comment; acceptable for MVP single-instance deployment
 
 #### Environment Variables
 - [x] `.env.local.example` documents all required env vars with dummy values
@@ -409,7 +419,7 @@ All bugs from previous QA runs have been re-verified against the current codebas
 - [x] Register API route uses generic error messages
 - [x] Forgot-password API route always returns success
 - [x] No PII beyond email stored (GDPR compliant per spec)
-- [ ] BUG-15: Placeholder `src/lib/supabase.ts` with non-null assertions still exists alongside the proper `src/lib/supabase/` directory (dead code, see Bugs section)
+- [x] Dead code placeholder `src/lib/supabase.ts` has been removed
 
 ---
 
@@ -437,66 +447,48 @@ All bugs from previous QA runs have been re-verified against the current codebas
 - [x] Form labels associated with inputs via `FormLabel` / `FormControl` pattern
 - [x] Error messages use `role="alert"` for screen readers
 - [x] Interactive elements have visible focus rings (`focus-visible:ring-[#B580FF]`)
-- [x] Logo SVG has `aria-hidden="true"` (decorative)
-- [ ] BUG-16: Color contrast concern -- `text-[#222222]/40` (40% opacity text) on `bg-[#F6F0FF]` may not meet WCAG AA 4.5:1 ratio (see Bugs section)
+- [x] Logo image has `alt="HR WORKS"` for screen readers
+- [ ] BUG-19: Color contrast concern -- `text-[#222222]/60` (60% opacity) on `bg-[#F6F0FF]` may still be below WCAG AA 4.5:1 for normal text (see Bugs section)
 
 ---
 
-### Bugs Found
+### Bugs Found (New in Re-Test #4)
 
-#### BUG-12: Google OAuth Bypasses Server-Side Rate Limiting
+#### BUG-19: WCAG Color Contrast Still Potentially Below AA Threshold
+- **Severity:** Low
+- **Files:** `AuthLayout.tsx` (line 40), `dashboard/page.tsx` (lines 15, 45, 66), `login/page.tsx` (line 142), `register/page.tsx` (lines 90, 226), `forgot-password/page.tsx` (lines 60, 124)
+- **Steps to Reproduce:**
+  1. Previous BUG-16 reported `text-[#222222]/40` (40% opacity). The fix changed it to `text-[#222222]/60` (60% opacity).
+  2. The effective color of `rgba(34,34,34,0.6)` on `#F6F0FF` blends to approximately `#858085`, which has a contrast ratio of roughly 3.5-3.8:1 against `#F6F0FF` -- still below the WCAG AA 4.5:1 threshold for normal-sized text.
+  3. Additionally, `text-[#767676]` (used for "OR" divider and "coming soon" text) has a contrast ratio of approximately 4.0:1 on `#F6F0FF` -- also below AA.
+  4. Expected: All body text meets WCAG AA 4.5:1 contrast ratio.
+  5. Actual: Helper/secondary text falls short by approximately 0.5-1.0 points.
+- **Mitigating Factor:** Affected text is secondary/decorative (helper text, dividers, placeholders). Core form labels and buttons use full-opacity colors that meet AA standards.
+- **Priority:** Nice to have
+
+#### BUG-20: Server-Side Password Length Not Validated in API Routes
 - **Severity:** Medium
-- **File:** `src/components/auth/GoogleOAuthButton.tsx`
+- **Files:** `src/app/api/auth/register/route.ts` (line 20), `src/app/api/auth/reset-password/route.ts` (line 20)
 - **Steps to Reproduce:**
-  1. While login and registration forms now use server-side API routes (rate-limited by proxy), the Google OAuth button still calls `supabase.auth.signInWithOAuth()` directly from the browser.
-  2. A script could rapidly trigger Google OAuth redirects without hitting the proxy rate limiter.
-  3. Expected: All auth actions should be subject to rate limiting.
-  4. Actual: Google OAuth calls bypass the proxy entirely.
-- **Mitigating Factor:** Google's own OAuth consent screen provides a natural throttle, and Supabase has built-in rate limiting on OAuth endpoints. The practical exploitability is low.
-- **Priority:** Fix in next sprint
+  1. The registration and reset-password API routes check `if (!password)` -- they validate presence but NOT minimum length.
+  2. A crafted `curl` or `fetch` request can bypass the client-side Zod validation: `curl -X POST http://localhost:3000/api/auth/register -H "Content-Type: application/json" -d '{"email":"test@test.com","password":"abc"}'`
+  3. If Supabase's dashboard minimum password length is set below 8 (the default is 6), a 3-character password could be accepted.
+  4. Expected: Server-side should enforce the same 8-character minimum as the client-side Zod schema, per the security rules: "Validate ALL user input on the server side with Zod" and "Never trust client-side validation alone."
+  5. Actual: Server-side only checks for non-empty password; relies entirely on Supabase's own password policy for length enforcement.
+- **Mitigating Factor:** Supabase enforces its own minimum password length (default 6 characters). The gap is only exploitable if Supabase's dashboard setting is below the app's intended 8-character minimum.
+- **Priority:** Fix before deployment (violates project security rules in `.claude/rules/security.md`)
 
-#### BUG-13: In-Memory Rate Limiter Does Not Persist Across Instances
-- **Severity:** Medium
-- **File:** `src/proxy.ts` (lines 8-22) and `src/lib/rate-limit.ts`
-- **Steps to Reproduce:**
-  1. The rate limiter uses a JavaScript `Map` stored in memory.
-  2. If the app runs behind multiple server instances (e.g., Vercel serverless functions or edge workers), each instance has its own rate limit map.
-  3. Additionally, the map resets on every server restart or cold start.
-  4. Expected: Rate limiting should be consistent regardless of which server instance handles the request.
-  5. Actual: An attacker can bypass rate limits by hitting different server instances, or simply waiting for a cold start.
-- **Note:** There is also a duplicate rate limiter -- one in `src/proxy.ts` (lines 8-22) and another in `src/lib/rate-limit.ts`. The proxy uses its own inline copy, not the shared module.
-- **Priority:** Fix in next sprint (consider Redis or Vercel KV for distributed rate limiting before scaling)
-
-#### BUG-14: Rate Limiter IP Detection Can Be Spoofed
+#### BUG-21: Unvalidated redirectTo Parameter Passed to Supabase
 - **Severity:** Low
-- **File:** `src/proxy.ts` (line 30)
+- **Files:** `src/app/api/auth/register/route.ts` (line 41), `src/app/api/auth/forgot-password/route.ts` (line 39), `src/app/api/auth/resend/route.ts` (line 41), `src/app/api/auth/google/route.ts` (line 36)
 - **Steps to Reproduce:**
-  1. The rate limiter extracts the client IP from `x-forwarded-for` header.
-  2. If the deployment does not strip/overwrite this header (which Vercel does correctly), an attacker could forge the header to bypass rate limits.
-  3. Falls back to `"unknown"` if header is missing, meaning all headerless requests share one bucket.
-- **Mitigating Factor:** Vercel's edge network sets `x-forwarded-for` reliably and strips client-provided values.
-- **Priority:** Nice to have (verify deployment platform behavior)
-
-#### BUG-15: Dead Code -- Placeholder supabase.ts Still Exists
-- **Severity:** Low
-- **File:** `src/lib/supabase.ts`
-- **Steps to Reproduce:**
-  1. The file `src/lib/supabase.ts` contains a commented-out placeholder client and exports `supabase = null`.
-  2. The actual Supabase clients live in `src/lib/supabase/client.ts` and `src/lib/supabase/server.ts`.
-  3. The placeholder file is dead code that could confuse developers.
-  4. It also contains non-null assertions (`!`) in the commented-out section, which set a bad example.
-- **Priority:** Nice to have (delete the file)
-
-#### BUG-16: Potential WCAG Color Contrast Issue
-- **Severity:** Low
-- **File:** Multiple auth pages, `AuthLayout.tsx`
-- **Steps to Reproduce:**
-  1. Several text elements use `text-[#222222]/40` (40% opacity dark text) on `bg-[#F6F0FF]` (light purple background).
-  2. The computed color is approximately `rgba(34, 34, 34, 0.4)` on `#F6F0FF`, resulting in an effective contrast ratio that may fall below WCAG AA (4.5:1 for normal text).
-  3. Affected elements include: "OR" divider text, "Task management features are coming soon" on dashboard, helper text on confirmation screens.
-  4. Expected: All text should meet WCAG AA contrast requirements.
-  5. Actual: Low-priority helper text may not meet the 4.5:1 ratio.
-- **Priority:** Nice to have (cosmetic/accessibility)
+  1. Four API routes accept a `redirectTo` (or `emailRedirectTo`) parameter from the client request body and pass it directly to Supabase SDK without validation.
+  2. An attacker could POST to `/api/auth/register` with `{"email":"victim@example.com","password":"longpassword","redirectTo":"https://evil.com/phish"}`.
+  3. If the attacker's domain is in Supabase's "Redirect URLs" allowlist (or if the allowlist uses overly permissive wildcards), the confirmation email would contain a link to the attacker's domain.
+  4. Expected: Server-side should validate `redirectTo` against an allowlist of trusted origins before passing to Supabase.
+  5. Actual: The URL is forwarded to Supabase without server-side validation; Supabase's "Redirect URLs" config is the only defense.
+- **Mitigating Factor:** Supabase validates redirect URLs against the project's configured "Redirect URLs" allowlist in the dashboard. If properly configured (which is the default), Supabase will reject unauthorized redirect URLs. The risk depends entirely on the Supabase dashboard configuration.
+- **Priority:** Nice to have (add server-side validation as defense-in-depth; ensure Supabase Redirect URLs allowlist is strict)
 
 #### BUG-EC1: Registration Does Not Distinguish Google OAuth Email (STILL OPEN)
 - **Severity:** Low
@@ -508,29 +500,6 @@ All bugs from previous QA runs have been re-verified against the current codebas
 - **Mitigating Factor:** The generic message mentions Google as an option. Supabase does not provide a distinct error code for OAuth-linked accounts, making exact detection impractical without an additional database lookup.
 - **Priority:** Nice to have
 
-#### BUG-17: Resend Confirmation Email Bypasses Server-Side Rate Limiting
-- **Severity:** Medium
-- **File:** `src/app/register/page.tsx` (lines 65-82)
-- **Steps to Reproduce:**
-  1. Complete registration to reach the "Check your email" confirmation screen.
-  2. The "Resend confirmation email" button calls `supabase.auth.resend()` directly from the browser (client-side SDK call).
-  3. This call goes directly to Supabase's API, bypassing the proxy rate limiter.
-  4. An attacker could repeatedly trigger resend requests to spam a victim's inbox.
-  5. Expected: Resend should be rate-limited.
-  6. Actual: No server-side rate limiting on resend; only the button's `disabled={resending}` state provides minimal protection (easily bypassed via DevTools or direct API calls).
-- **Mitigating Factor:** Supabase has built-in rate limiting on the resend endpoint.
-- **Priority:** Fix in next sprint
-
-#### BUG-18: Reset Password Page Calls Supabase SDK Directly (Bypasses Rate Limiting)
-- **Severity:** Low
-- **File:** `src/app/reset-password/page.tsx` (lines 43-46)
-- **Steps to Reproduce:**
-  1. Navigate to `/reset-password` with a valid token.
-  2. The form calls `supabase.auth.updateUser({ password })` directly from the browser.
-  3. This bypasses the proxy rate limiter. However, a valid session token is required, limiting exploitability.
-- **Mitigating Factor:** Requires a valid, authenticated session from the reset email link. Practical risk is very low.
-- **Priority:** Nice to have
-
 ---
 
 ### Regression Testing
@@ -538,25 +507,31 @@ All bugs from previous QA runs have been re-verified against the current codebas
 No other features are currently in "Deployed" status per `features/INDEX.md`. All other features (PROJ-2 through PROJ-5) are "Planned" status and have no implementation to regress against.
 
 - [x] Home page (`/`) correctly redirects to `/login`
-- [x] Build compiles without errors
+- [x] Build compiles without errors (`npm run build` -- PASS)
 - [x] No TypeScript errors
+- [x] ESLint passes with no errors (`npx eslint src/` -- PASS)
 - [x] All routes render correctly in build output
 
 ---
 
 ### Summary
 
-- **Acceptance Criteria:** 15/15 PASSED (all acceptance criteria now pass, including AC-8 which was previously partial)
-- **Edge Cases:** 5/6 passed, 1 partial pass (EC-1: Google OAuth email detection -- Low severity)
-- **Previously Reported Bugs (BUG-1 through BUG-11):** ALL 11 FIXED and verified
-- **New Bugs Found:** 7
-  - Medium: 3 (BUG-12: OAuth rate limit bypass, BUG-13: in-memory rate limiter, BUG-17: resend rate limit bypass)
-  - Low: 4 (BUG-14: IP spoofing, BUG-15: dead code, BUG-16: color contrast, BUG-18: reset password rate limit bypass, BUG-EC1: Google OAuth message)
-- **Total Open Bugs:** 8 (0 critical, 0 high, 3 medium, 5 low)
-- **Security:** Strong. All critical and high-severity issues from previous runs are fixed. The open redirect is patched, security headers are in place, user enumeration is prevented on all auth endpoints, and rate limiting covers the main auth flows. Remaining medium-severity items relate to edge cases in rate limiting coverage.
+- **Acceptance Criteria:** 15/15 PASSED
+- **Edge Cases:** 5/6 passed, 1 partial pass (EC-1: Google OAuth email detection -- Low severity, accepted limitation)
+- **Previously Reported Bugs (BUG-1 through BUG-18):** 16 FIXED, 1 PARTIALLY FIXED (BUG-13 in-memory store acknowledged, BUG-16 improved but see BUG-19), 1 UNCHANGED (BUG-EC1 accepted)
+- **New Bugs Found:** 3
+  - Medium: 1 (BUG-20: missing server-side password length validation)
+  - Low: 2 (BUG-19: color contrast still below AA, BUG-21: unvalidated redirectTo)
+- **Total Open Bugs:** 4 (0 critical, 0 high, 1 medium, 3 low)
+  - BUG-19 (Low): Color contrast below WCAG AA
+  - BUG-20 (Medium): No server-side password length validation
+  - BUG-21 (Low): Unvalidated redirectTo parameter
+  - BUG-EC1 (Low): Generic OAuth email message
+- **Security:** Strong. All critical and high-severity issues from previous runs are fixed. Rate limiting now covers all 6 auth endpoints server-side. Open redirect is protected. User enumeration is prevented. BUG-20 (missing server-side password validation) is the only actionable security gap and should be fixed before deployment per the project's own security rules.
 - **Build:** PASS
-- **Production Ready:** YES (conditionally)
-- **Recommendation:** The application is production-ready for an MVP launch. All critical and high-severity bugs have been resolved. The 3 medium-severity rate limiting gaps (BUG-12, BUG-13, BUG-17) are mitigated by Supabase's built-in rate limiting and can be addressed in the next sprint. The low-severity items are cosmetic or defensive-in-depth improvements. Deploy with the understanding that distributed rate limiting (BUG-13) should be implemented before scaling beyond a single instance.
+- **Lint:** PASS
+- **Production Ready:** YES (conditionally -- fix BUG-20 first)
+- **Recommendation:** Fix BUG-20 (server-side password validation) before deployment. It directly violates the project's security rules and is a straightforward fix (add Zod validation to the register and reset-password API routes). The 3 low-severity bugs are cosmetic or defense-in-depth improvements that can be addressed in the next sprint.
 
 ## Deployment
 _To be added by /deploy_
