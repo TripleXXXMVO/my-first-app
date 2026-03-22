@@ -35,19 +35,24 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (values: ForgotPasswordFormValues) => {
     setLoading(true);
 
-    // BUG-7: Call server-side route which always returns success (prevents user enumeration)
-    await fetch("/api/auth/forgot-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: values.email,
-        redirectTo: `${window.location.origin}/reset-password`,
-      }),
-    });
-
-    setLoading(false);
-    setSentEmail(values.email);
-    setEmailSent(true);
+    try {
+      // Always show success — never reveal whether an email is registered
+      await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: values.email,
+          redirectTo: `${window.location.origin}/reset-password`,
+        }),
+      });
+      setSentEmail(values.email);
+      setEmailSent(true);
+    } catch {
+      setSentEmail(values.email);
+      setEmailSent(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (emailSent) {

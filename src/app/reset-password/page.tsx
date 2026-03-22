@@ -39,21 +39,25 @@ export default function ResetPasswordPage() {
     setServerError(null);
     setLoading(true);
 
-    const response = await fetch("/api/auth/reset-password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ password: values.password }),
-    });
-    const data = await response.json();
+    try {
+      const response = await fetch("/api/auth/reset-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: values.password }),
+      });
+      const data = await response.json();
 
-    setLoading(false);
+      if (!response.ok) {
+        setServerError(data.error ?? "Something went wrong. Please try again or request a new reset link.");
+        return;
+      }
 
-    if (!response.ok) {
-      setServerError(data.error ?? "Something went wrong. Please try again or request a new reset link.");
-      return;
+      setSuccess(true);
+    } catch {
+      setServerError("Network error. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setSuccess(true);
   };
 
   if (success) {

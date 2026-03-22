@@ -39,43 +39,52 @@ export default function RegisterPage() {
     setServerError(null);
     setLoading(true);
 
-    const response = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: values.email,
-        password: values.password,
-        redirectTo: `${window.location.origin}/api/auth/callback`,
-      }),
-    });
-    const data = await response.json();
+    try {
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: values.email,
+          password: values.password,
+          redirectTo: `${window.location.origin}/api/auth/callback`,
+        }),
+      });
+      const data = await response.json();
 
-    setLoading(false);
+      if (!response.ok) {
+        setServerError(data.error ?? "Registration failed. Please try again.");
+        return;
+      }
 
-    if (!response.ok) {
-      setServerError(data.error ?? "Registration failed. Please try again.");
-      return;
+      setEmailSent(true);
+    } catch {
+      setServerError("Network error. Please check your connection and try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setEmailSent(true);
   };
 
   const handleResend = async () => {
     setResending(true);
     setResendMessage(null);
-    const response = await fetch("/api/auth/resend", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email: form.getValues("email"),
-        redirectTo: `${window.location.origin}/api/auth/callback`,
-      }),
-    });
-    setResending(false);
-    if (!response.ok) {
-      setResendMessage("Could not resend the email. Please try again.");
-    } else {
-      setResendMessage("Confirmation email resent! Check your inbox.");
+    try {
+      const response = await fetch("/api/auth/resend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: form.getValues("email"),
+          redirectTo: `${window.location.origin}/api/auth/callback`,
+        }),
+      });
+      if (!response.ok) {
+        setResendMessage("Could not resend the email. Please try again.");
+      } else {
+        setResendMessage("Confirmation email resent! Check your inbox.");
+      }
+    } catch {
+      setResendMessage("Network error. Please check your connection and try again.");
+    } finally {
+      setResending(false);
     }
   };
 
