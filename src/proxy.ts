@@ -11,7 +11,6 @@ const AUTH_POST_ROUTES = [
   "/api/auth/register",
   "/api/auth/forgot-password",
   "/api/auth/resend",
-  "/api/auth/google",
   "/api/auth/reset-password",
 ];
 

@@ -58,6 +58,46 @@
 ---
 <!-- Sections below are added by subsequent skills -->
 
+## Architecture Change: Remove Google OAuth (2026-03-22) — IMPLEMENTED
+
+**Status:** Complete. Build passes, lint passes.
+
+### Motivation
+Google OAuth is being removed to simplify the authentication surface. Email/password + password reset is sufficient for the MVP.
+
+### What Gets Deleted
+- `src/components/auth/GoogleOAuthButton.tsx` — entire file
+- `src/app/api/auth/google/route.ts` — entire file
+
+### What Gets Updated
+- `/login` page — remove `GoogleOAuthButton` and "OR" divider
+- `/register` page — remove `GoogleOAuthButton` and "OR" divider
+- Rate limiter config (`src/lib/rate-limit.ts` or `src/proxy.ts`) — remove `/api/auth/google` from protected routes list
+
+### What Stays Unchanged
+- Email/password login and registration
+- Password reset flow
+- Auth callback route (still needed for email confirmation links)
+- Session management, route protection, rate limiting on remaining routes
+
+### Simplified Auth Structure (After)
+```
+/login
++-- LoginForm
+|   +-- EmailInput + PasswordInput
+|   +-- "Forgot password?" Link
+
+/register
++-- RegisterForm
+|   +-- EmailInput + PasswordInput + ConfirmPasswordInput
+```
+
+### Bugs Closed by This Change
+- BUG-EC1 (Google OAuth email distinction) — no longer relevant
+- BUG-12 (Google OAuth bypasses rate limiting) — no longer relevant (route deleted)
+
+---
+
 ## Tech Design (Solution Architect)
 
 ### Component Structure
@@ -182,42 +222,48 @@ All other auth operations (login, register, logout, password reset) call Supabas
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase anonymous/public key
 - Google OAuth must be configured in Supabase dashboard
 
-## QA Test Results (Full Re-Test #4)
+## QA Test Results (Re-Test #6 -- Post Bug Fix Commit b8bfb85)
 
-**Tested:** 2026-03-22 (Complete re-test after bug fix commits c643379 and 21d6a53)
+**Tested:** 2026-03-22
 **App URL:** http://localhost:3000
 **Tester:** QA Engineer (AI)
 **Build Status:** PASS (Next.js 16, compiled successfully, no TypeScript errors)
 **Lint Status:** PASS (ESLint -- no errors)
+**Scope:** Full re-test after bug fix commit b8bfb85 (BUG-25, BUG-19, BUG-21, BUG-26) and uncommitted Google OAuth removal
 
 ---
 
 ### Previous Bug Fix Verification
 
-All bugs from previous QA runs (BUG-1 through BUG-18 and BUG-EC1) have been re-verified against the current codebase (commit 54ed34a).
+All bugs from previous QA runs (BUG-1 through BUG-26 and BUG-EC1) have been re-verified against the current working tree.
 
 | Bug | Description | Previous Severity | Status |
 |-----|-------------|-------------------|--------|
-| BUG-1 | Open Redirect in Auth Callback | Critical | FIXED -- `getSafeRedirectPath()` validates `next` param, blocks `//`, `:`, non-`/` prefixed |
-| BUG-2 | No Security Headers | High | FIXED -- `next.config.ts` sets X-Frame-Options, X-Content-Type-Options, Referrer-Policy, HSTS, Permissions-Policy |
+| BUG-1 | Open Redirect in Auth Callback | Critical | FIXED -- `getSafeRedirectPath()` validates `next` param |
+| BUG-2 | No Security Headers | High | FIXED -- `next.config.ts` sets all required headers |
 | BUG-3 | Missing .env.local.example | Medium | FIXED -- `.env.local.example` exists with dummy values |
-| BUG-4 | Missing Resend Confirmation Email | Medium | FIXED -- "Resend confirmation email" button on confirmation screen |
+| BUG-4 | Missing Resend Confirmation Email | Medium | FIXED -- "Resend confirmation email" button present |
 | BUG-5 | No Rate Limiting on Auth Endpoints | High | FIXED -- Proxy rate limiter covers all auth POST routes |
-| BUG-5b | Rate Limiting Ineffective (client-side calls) | High | FIXED -- All auth forms use `fetch("/api/auth/...")` server routes |
-| BUG-6 | Server-Side Non-Null Assertion | Medium | FIXED -- `server.ts` throws descriptive error on missing env vars |
-| BUG-7 | Password Reset User Enumeration | Medium | FIXED -- `/api/auth/forgot-password` always returns `{ success: true }` |
-| BUG-8 | Home Page Shows Default Template | Low | FIXED -- `/` redirects to `/login` via server-side `redirect()` |
-| BUG-9 | Spec Documents middleware.ts | Low | FIXED -- Spec correctly references `proxy.ts` |
+| BUG-5b | Rate Limiting Ineffective (client-side calls) | High | FIXED -- All auth forms use server API routes |
+| BUG-6 | Server-Side Non-Null Assertion | Medium | FIXED -- Descriptive error on missing env vars |
+| BUG-7 | Password Reset User Enumeration | Medium | FIXED -- Always returns success |
+| BUG-8 | Home Page Shows Default Template | Low | FIXED -- `/` redirects to `/login` |
+| BUG-9 | Spec Documents middleware.ts | Low | FIXED -- Spec references `proxy.ts` |
 | BUG-10 | Login Password Min Length | Low | FIXED -- `loginSchema` enforces `min(8)` |
-| BUG-11 | Auth Callback Non-Null Assertion | Low | FIXED -- Callback route uses runtime guard with graceful redirect |
-| BUG-12 | Google OAuth Bypasses Rate Limiting | Medium | FIXED -- `GoogleOAuthButton` now POSTs to `/api/auth/google` server route; route is in `AUTH_POST_ROUTES` |
-| BUG-13 | Duplicate Rate Limiter / In-Memory Store | Medium | PARTIALLY FIXED -- Duplicate removed; proxy now imports from `@/lib/rate-limit`. In-memory `Map` limitation acknowledged in comment (line 8 of proxy.ts). Acceptable for MVP single-instance deployment. |
-| BUG-14 | Rate Limiter IP Spoofing | Low | FIXED -- `getClientIp()` now uses `request.ip` first (set by Next.js/Vercel, cannot be spoofed); falls back to rightmost IP in `x-forwarded-for` (outermost trusted proxy) |
-| BUG-15 | Dead Code -- Placeholder supabase.ts | Low | FIXED -- File `src/lib/supabase.ts` has been deleted |
-| BUG-16 | WCAG Color Contrast Issue (40% opacity) | Low | PARTIALLY FIXED -- Changed from `/40` to `/60` opacity. See BUG-19 for remaining concern. |
-| BUG-17 | Resend Bypasses Rate Limiting | Medium | FIXED -- Resend now POSTs to `/api/auth/resend` server route; route is in `AUTH_POST_ROUTES` |
-| BUG-18 | Reset Password Bypasses Rate Limiting | Low | FIXED -- Reset password now POSTs to `/api/auth/reset-password` server route; route is in `AUTH_POST_ROUTES` |
-| BUG-EC1 | Google OAuth Email Distinction | Low | UNCHANGED -- Still generic message. Accepted as impractical without additional DB lookup. |
+| BUG-11 | Auth Callback Non-Null Assertion | Low | FIXED -- Runtime guard with graceful redirect |
+| BUG-12 | Google OAuth Bypasses Rate Limiting | Medium | N/A -- Google OAuth removed entirely |
+| BUG-13 | Duplicate Rate Limiter / In-Memory Store | Medium | PARTIALLY FIXED -- Acceptable for MVP single-instance |
+| BUG-14 | Rate Limiter IP Spoofing | Low | FIXED -- Uses `request.ip` first |
+| BUG-15 | Dead Code -- Placeholder supabase.ts | Low | FIXED -- File deleted |
+| BUG-16 | WCAG Color Contrast Issue (40% opacity) | Low | PARTIALLY FIXED -- Changed to `/60`, see BUG-19 |
+| BUG-17 | Resend Bypasses Rate Limiting | Medium | FIXED -- POSTs to server route |
+| BUG-18 | Reset Password Bypasses Rate Limiting | Low | FIXED -- POSTs to server route |
+| BUG-19 | WCAG Color Contrast Below AA | Low | PARTIALLY FIXED -- Auth pages now use `#6b6b6b`; dashboard still uses `#222222/60` (see BUG-19 updated below) |
+| BUG-20 | Server-Side Password Length Not Validated | Medium | FIXED -- `password.length < 8` check in register and reset-password routes |
+| BUG-21 | Unvalidated redirectTo Parameter | Low | PARTIALLY FIXED -- Pathname validation added, but hostname not validated (see BUG-27) |
+| BUG-25 | Register Error References Google | Low | FIXED -- Now says "Try signing in instead." |
+| BUG-26 | Empty google directory remains | Low | FIXED -- `src/app/api/auth/google/` directory no longer exists |
+| BUG-EC1 | Google OAuth Email Distinction | Low | N/A -- Google OAuth removed |
 
 ---
 
@@ -228,18 +274,19 @@ All bugs from previous QA runs (BUG-1 through BUG-18 and BUG-EC1) have been re-v
 - [x] Zod `registerSchema` enforces minimum 8 characters on password (client-side)
 - [x] Form uses `react-hook-form` with `zodResolver` for client-side validation
 - [x] Registration POSTs to `/api/auth/register` server route which calls `supabase.auth.signUp`
-- [x] Server-side input validation checks for required email and password
-- [ ] BUG-20: Server-side does NOT validate password minimum length (see Bugs section)
-- **Result: PASS (client-side enforced; see BUG-20 for defense-in-depth gap)**
+- [x] Server-side validates required email and password
+- [x] Server-side enforces `password.length < 8` (BUG-20 fixed)
+- **Result: PASS**
 
 #### AC-2: Registration fails with a clear error message if the email is already in use
-- [x] Server route (`/api/auth/register`) checks Supabase error for "already", "registered", "exists" keywords
-- [x] Returns: "This email is already registered. Try signing in or use Google." (HTTP 409)
-- [x] Client displays server error message
+- [x] Server route checks Supabase error for "already", "registered", "exists" keywords
+- [x] Returns "This email is already registered. Try signing in instead." (BUG-25 FIXED)
+- [x] Client displays server error message via `serverError` state
 - **Result: PASS**
 
 #### AC-3: Registration fails if the password does not meet minimum requirements
 - [x] Zod schema enforces `min(8)` with message "Password must be at least 8 characters"
+- [x] Server-side also enforces `password.length < 8` with HTTP 400 response
 - [x] Inline error message displayed below password field via `FormMessage`
 - **Result: PASS**
 
@@ -252,11 +299,14 @@ All bugs from previous QA runs (BUG-1 through BUG-18 and BUG-EC1) have been re-v
 - **Result: PASS**
 
 #### AC-5: User can sign up and log in via Google OAuth (1-click)
-- [x] `GoogleOAuthButton` component present on both `/login` and `/register` pages
-- [x] POSTs to `/api/auth/google` which calls `supabase.auth.signInWithOAuth` with `skipBrowserRedirect: true`
-- [x] Returns OAuth URL; client redirects via `window.location.href`
-- [x] Button disabled during loading to prevent double clicks
-- **Result: PASS**
+- [x] REMOVED by architecture decision (2026-03-22). Google OAuth descoped from MVP.
+- [x] `GoogleOAuthButton.tsx` file deleted -- verified no file on disk
+- [x] `/api/auth/google/route.ts` file deleted -- verified no file on disk
+- [x] `src/app/api/auth/google/` directory deleted -- verified no directory on disk (BUG-26 FIXED)
+- [x] Login and register pages no longer show Google button or "OR" divider
+- [x] `/api/auth/google` removed from `AUTH_POST_ROUTES` in proxy.ts
+- [x] No remaining imports of `GoogleOAuthButton` in any source file (verified via grep)
+- **Result: N/A (removed per architecture change)**
 
 #### AC-6: User can log in with email and password after registration
 - [x] Login form at `/login` with email and password fields
@@ -276,7 +326,7 @@ All bugs from previous QA runs (BUG-1 through BUG-18 and BUG-EC1) have been re-v
 - [x] Forgot password form POSTs to `/api/auth/forgot-password` server route
 - [x] Server route always returns success regardless of whether email exists (prevents user enumeration)
 - [x] Client always shows "Check your email" confirmation screen
-- [x] "Resend email" button resets form for re-submission
+- [x] "Resend email" button calls the same endpoint again
 - **Result: PASS**
 
 #### AC-9: Password reset link is valid for 1 hour and can only be used once
@@ -287,6 +337,7 @@ All bugs from previous QA runs (BUG-1 through BUG-18 and BUG-EC1) have been re-v
 #### AC-10: User can set a new password after clicking the reset link
 - [x] `/reset-password` page with password + confirm password fields
 - [x] POSTs to `/api/auth/reset-password` which calls `supabase.auth.updateUser({ password })`
+- [x] Server-side enforces `password.length < 8` (BUG-20 fixed)
 - [x] On success, shows "Password updated" with "Go to dashboard" button
 - [x] Handles expired/invalid token with specific message and link to `/forgot-password`
 - [x] Handles "same password" error with specific message
@@ -325,15 +376,12 @@ All bugs from previous QA runs (BUG-1 through BUG-18 and BUG-EC1) have been re-v
 ### Edge Cases Status
 
 #### EC-1: Email already linked to a Google OAuth account
-- [ ] Registration error does not specifically distinguish Google OAuth-linked emails
-- [x] Generic message "This email is already registered. Try signing in or use Google." partially addresses the intent by mentioning Google
-- **Severity: Low** -- Supabase does not provide a distinct error code for OAuth-linked accounts, making exact detection impractical
-- **Result: PARTIAL PASS (unchanged, accepted limitation)**
+- [x] N/A -- Google OAuth has been removed from the MVP.
+- **Result: N/A (removed per architecture change)**
 
 #### EC-2: Google OAuth flow cancelled by user
-- [x] `GoogleOAuthButton` silently resets loading state on error (`!response.ok || !data.url` returns early)
-- [x] Matches spec: "Return to login page with no error (silent cancel)"
-- **Result: PASS**
+- [x] N/A -- Google OAuth has been removed from the MVP.
+- **Result: N/A (removed per architecture change)**
 
 #### EC-3: Password reset link expired
 - [x] Reset password API route checks for "expired", "invalid", or "token" in error message
@@ -344,12 +392,12 @@ All bugs from previous QA runs (BUG-1 through BUG-18 and BUG-EC1) have been re-v
 #### EC-4: Registration form submitted multiple times quickly (double-click)
 - [x] Submit button has `disabled={loading}` to prevent double submissions
 - [x] Loading text changes to "Creating account..." during submission
-- [x] Same pattern applied to all auth forms (login: "Signing in...", forgot-password: "Sending...", reset-password: "Updating...", Google OAuth: "Redirecting...")
+- [x] Same pattern applied to all auth forms (login: "Signing in...", forgot-password: "Sending...", reset-password: "Updating...")
 - **Result: PASS**
 
 #### EC-5: Google account email changes after linking
-- [x] Handled by Supabase identity refresh on next OAuth login (server-side, no custom code needed)
-- **Result: PASS**
+- [x] N/A -- Google OAuth has been removed from the MVP.
+- **Result: N/A (removed per architecture change)**
 
 #### EC-6: Confirmation email not received -- resend option
 - [x] Confirmation screen has "Resend confirmation email" button
@@ -372,14 +420,15 @@ All bugs from previous QA runs (BUG-1 through BUG-18 and BUG-EC1) have been re-v
 #### Input Validation
 - [x] Client-side: All forms validated via Zod schemas + react-hook-form
 - [x] Server-side: API routes validate required fields before calling Supabase
-- [ ] BUG-20: Server-side API routes do NOT enforce password minimum length (8 chars) -- only check for presence. A crafted POST request bypassing the browser can register with a short password (see Bugs section)
+- [x] Server-side: Register and reset-password routes enforce `password.length < 8` (BUG-20 fixed)
 - [x] No `dangerouslySetInnerHTML`, `eval()`, `new Function()`, or `innerHTML` usage found anywhere in the codebase
 - [x] React/JSX auto-escapes all rendered output
 
 #### Open Redirect Protection
 - [x] Auth callback `getSafeRedirectPath()` blocks protocol-relative URLs (`//`), URLs with `:`, and non-`/` prefixed values
 - [x] Default redirect is `/dashboard`
-- [ ] BUG-21: Server-side API routes pass client-supplied `redirectTo` URL to Supabase without validation (see Bugs section)
+- [x] `redirectTo` validation added to register, forgot-password, and resend routes (BUG-21 fix)
+- [ ] BUG-27: `redirectTo` validation checks pathname only, not hostname -- allows external domains with matching pathname (see Bugs section)
 
 #### Security Headers (next.config.ts)
 - [x] `X-Frame-Options: DENY` -- prevents clickjacking
@@ -391,8 +440,9 @@ All bugs from previous QA runs (BUG-1 through BUG-18 and BUG-EC1) have been re-v
 
 #### Rate Limiting
 - [x] Proxy-level rate limiter: 10 requests per IP per 15 minutes on auth POST routes
-- [x] Covers all 6 auth endpoints: `/api/auth/login`, `/api/auth/register`, `/api/auth/forgot-password`, `/api/auth/resend`, `/api/auth/google`, `/api/auth/reset-password`
-- [x] All auth actions now go through server API routes (no more direct Supabase SDK calls from browser for auth operations)
+- [x] Covers all 5 auth endpoints: `/api/auth/login`, `/api/auth/register`, `/api/auth/forgot-password`, `/api/auth/resend`, `/api/auth/reset-password`
+- [x] Google OAuth route correctly removed from `AUTH_POST_ROUTES`
+- [x] All auth actions go through server API routes (no direct Supabase SDK calls from browser for auth operations)
 - [x] `getClientIp()` uses `request.ip` first (Vercel-verified), then rightmost `x-forwarded-for` as fallback
 - [x] In-memory store limitation acknowledged in code comment; acceptable for MVP single-instance deployment
 
@@ -419,7 +469,16 @@ All bugs from previous QA runs (BUG-1 through BUG-18 and BUG-EC1) have been re-v
 - [x] Register API route uses generic error messages
 - [x] Forgot-password API route always returns success
 - [x] No PII beyond email stored (GDPR compliant per spec)
-- [x] Dead code placeholder `src/lib/supabase.ts` has been removed
+
+#### Google OAuth Removal Verification
+- [x] `GoogleOAuthButton.tsx` deleted -- no file on disk
+- [x] `/api/auth/google/route.ts` deleted -- no file on disk
+- [x] `src/app/api/auth/google/` directory deleted -- no directory on disk (BUG-26 FIXED)
+- [x] No imports of `GoogleOAuthButton` in any remaining source file (verified via grep)
+- [x] `/api/auth/google` removed from `AUTH_POST_ROUTES` in proxy.ts
+- [x] Login page no longer renders Google button or "OR" divider
+- [x] Register page no longer renders Google button or "OR" divider
+- [x] Register error message no longer references Google (BUG-25 FIXED)
 
 ---
 
@@ -448,57 +507,52 @@ All bugs from previous QA runs (BUG-1 through BUG-18 and BUG-EC1) have been re-v
 - [x] Error messages use `role="alert"` for screen readers
 - [x] Interactive elements have visible focus rings (`focus-visible:ring-[#B580FF]`)
 - [x] Logo image has `alt="HR WORKS"` for screen readers
-- [ ] BUG-19: Color contrast concern -- `text-[#222222]/60` (60% opacity) on `bg-[#F6F0FF]` may still be below WCAG AA 4.5:1 for normal text (see Bugs section)
+- [ ] BUG-19: Color contrast on dashboard still below WCAG AA threshold (see Bugs section)
 
 ---
 
-### Bugs Found (New in Re-Test #4)
+### Bugs Found (New in Re-Test #6)
 
-#### BUG-19: WCAG Color Contrast Still Potentially Below AA Threshold
+#### BUG-27: redirectTo Validation Checks Pathname But Not Hostname (Incomplete Fix for BUG-21)
 - **Severity:** Low
-- **Files:** `AuthLayout.tsx` (line 40), `dashboard/page.tsx` (lines 15, 45, 66), `login/page.tsx` (line 142), `register/page.tsx` (lines 90, 226), `forgot-password/page.tsx` (lines 60, 124)
+- **Files:** `src/app/api/auth/register/route.ts` (lines 27-34), `src/app/api/auth/forgot-password/route.ts` (lines 24-31), `src/app/api/auth/resend/route.ts` (lines 24-31)
 - **Steps to Reproduce:**
-  1. Previous BUG-16 reported `text-[#222222]/40` (40% opacity). The fix changed it to `text-[#222222]/60` (60% opacity).
-  2. The effective color of `rgba(34,34,34,0.6)` on `#F6F0FF` blends to approximately `#858085`, which has a contrast ratio of roughly 3.5-3.8:1 against `#F6F0FF` -- still below the WCAG AA 4.5:1 threshold for normal-sized text.
-  3. Additionally, `text-[#767676]` (used for "OR" divider and "coming soon" text) has a contrast ratio of approximately 4.0:1 on `#F6F0FF` -- also below AA.
-  4. Expected: All body text meets WCAG AA 4.5:1 contrast ratio.
-  5. Actual: Helper/secondary text falls short by approximately 0.5-1.0 points.
-- **Mitigating Factor:** Affected text is secondary/decorative (helper text, dividers, placeholders). Core form labels and buttons use full-opacity colors that meet AA standards.
-- **Priority:** Nice to have
+  1. Send a POST request to `/api/auth/register` with body `{ "email": "test@example.com", "password": "12345678", "redirectTo": "https://evil.com/api/auth/callback" }`.
+  2. The server parses the URL, checks `parsed.pathname.startsWith("/api/auth/callback")`, and this check PASSES because the pathname is `/api/auth/callback` regardless of the hostname.
+  3. Expected: The server should reject `redirectTo` URLs pointing to external domains.
+  4. Actual: The URL passes validation and is forwarded to Supabase's `emailRedirectTo`.
+  5. Same vulnerability exists in `/api/auth/forgot-password` (checks `/reset-password` pathname) and `/api/auth/resend` (checks `/api/auth/callback` pathname).
+- **Mitigation:** Supabase's server-side Redirect URLs allowlist is the primary defense. If the allowlist is configured correctly (specific origins only, no wildcards), Supabase will reject external redirect URLs. This is a defense-in-depth concern.
+- **Fix:** Add `parsed.origin === new URL(request.url).origin` check alongside the pathname check, or construct the redirect URL server-side rather than accepting it from the client.
+- **Impact:** If Supabase's allowlist is misconfigured, an attacker could craft registration/reset emails that redirect users to a phishing site after clicking the confirmation link.
+- **Priority:** Fix in next sprint (mitigated by Supabase allowlist)
 
-#### BUG-20: Server-Side Password Length Not Validated in API Routes
+#### BUG-28: No Error Handling for Network Failures in Client-Side Form Submissions
 - **Severity:** Medium
-- **Files:** `src/app/api/auth/register/route.ts` (line 20), `src/app/api/auth/reset-password/route.ts` (line 20)
+- **Files:** `src/app/login/page.tsx` (lines 34-53), `src/app/register/page.tsx` (lines 38-61, 63-80), `src/app/forgot-password/page.tsx` (lines 35-51), `src/app/reset-password/page.tsx` (lines 38-57)
 - **Steps to Reproduce:**
-  1. The registration and reset-password API routes check `if (!password)` -- they validate presence but NOT minimum length.
-  2. A crafted `curl` or `fetch` request can bypass the client-side Zod validation: `curl -X POST http://localhost:3000/api/auth/register -H "Content-Type: application/json" -d '{"email":"test@test.com","password":"abc"}'`
-  3. If Supabase's dashboard minimum password length is set below 8 (the default is 6), a 3-character password could be accepted.
-  4. Expected: Server-side should enforce the same 8-character minimum as the client-side Zod schema, per the security rules: "Validate ALL user input on the server side with Zod" and "Never trust client-side validation alone."
-  5. Actual: Server-side only checks for non-empty password; relies entirely on Supabase's own password policy for length enforcement.
-- **Mitigating Factor:** Supabase enforces its own minimum password length (default 6 characters). The gap is only exploitable if Supabase's dashboard setting is below the app's intended 8-character minimum.
-- **Priority:** Fix before deployment (violates project security rules in `.claude/rules/security.md`)
+  1. Open any auth page (e.g., `/login`).
+  2. Disconnect from the network (e.g., enable airplane mode, or stop the dev server).
+  3. Submit the form.
+  4. Expected: A user-friendly error message like "Network error. Please check your connection and try again." The submit button should return to its enabled state.
+  5. Actual: The `fetch()` call throws an unhandled exception. The `loading` state remains `true` because `setLoading(false)` is never reached. The submit button stays permanently disabled with loading text (e.g., "Signing in..."). The user must refresh the page to try again. On the login page specifically, `response.json()` on a failed fetch will also throw.
+- **Impact:** Users who experience any network interruption during form submission will see a frozen form with no feedback. They must manually refresh the page to recover.
+- **Priority:** Fix before deployment
 
-#### BUG-21: Unvalidated redirectTo Parameter Passed to Supabase
-- **Severity:** Low
-- **Files:** `src/app/api/auth/register/route.ts` (line 41), `src/app/api/auth/forgot-password/route.ts` (line 39), `src/app/api/auth/resend/route.ts` (line 41), `src/app/api/auth/google/route.ts` (line 36)
-- **Steps to Reproduce:**
-  1. Four API routes accept a `redirectTo` (or `emailRedirectTo`) parameter from the client request body and pass it directly to Supabase SDK without validation.
-  2. An attacker could POST to `/api/auth/register` with `{"email":"victim@example.com","password":"longpassword","redirectTo":"https://evil.com/phish"}`.
-  3. If the attacker's domain is in Supabase's "Redirect URLs" allowlist (or if the allowlist uses overly permissive wildcards), the confirmation email would contain a link to the attacker's domain.
-  4. Expected: Server-side should validate `redirectTo` against an allowlist of trusted origins before passing to Supabase.
-  5. Actual: The URL is forwarded to Supabase without server-side validation; Supabase's "Redirect URLs" config is the only defense.
-- **Mitigating Factor:** Supabase validates redirect URLs against the project's configured "Redirect URLs" allowlist in the dashboard. If properly configured (which is the default), Supabase will reject unauthorized redirect URLs. The risk depends entirely on the Supabase dashboard configuration.
-- **Priority:** Nice to have (add server-side validation as defense-in-depth; ensure Supabase Redirect URLs allowlist is strict)
+---
 
-#### BUG-EC1: Registration Does Not Distinguish Google OAuth Email (STILL OPEN)
+### Previously Open Bugs (Carried Forward)
+
+#### BUG-19: WCAG Color Contrast Below AA Threshold on Dashboard (PARTIALLY FIXED)
 - **Severity:** Low
-- **File:** `src/app/api/auth/register/route.ts` (lines 44-51)
-- **Steps to Reproduce:**
-  1. Register with an email address that is already linked to a Google OAuth account
-  2. Expected: "This email is already linked to a Google account. Sign in with Google."
-  3. Actual: "This email is already registered. Try signing in or use Google." (generic message)
-- **Mitigating Factor:** The generic message mentions Google as an option. Supabase does not provide a distinct error code for OAuth-linked accounts, making exact detection impractical without an additional database lookup.
+- **Files:** `src/app/dashboard/page.tsx` (lines 15, 45, 66 -- `text-[#222222]/60`), `src/app/dashboard/page.tsx` (line 71 -- `text-[#767676]`)
+- **Summary:** Auth pages have been updated to use `text-[#6b6b6b]` which is an improvement. However, the dashboard still uses `text-[#222222]/60` on `bg-[#F6F0FF]` (~3.5-3.8:1 contrast) and `text-[#767676]` on white (~4.54:1, borderline). The `text-[#222222]/60` on white backgrounds in the dashboard header is approximately 4.5:1 (borderline pass). Overall, the issue is now limited to the dashboard page only.
 - **Priority:** Nice to have
+
+#### BUG-13: In-Memory Rate Limit Store (Accepted for MVP)
+- **Severity:** Low (downgraded from Medium)
+- **Summary:** Rate limiter uses in-memory Map, which resets on process restart and does not work across multiple instances. Acknowledged in code comment. Acceptable for MVP single-instance deployment on Vercel.
+- **Priority:** Fix when scaling to multi-instance
 
 ---
 
@@ -511,27 +565,34 @@ No other features are currently in "Deployed" status per `features/INDEX.md`. Al
 - [x] No TypeScript errors
 - [x] ESLint passes with no errors (`npx eslint src/` -- PASS)
 - [x] All routes render correctly in build output
+- [x] Google OAuth removal did not break any remaining pages or routes
+- [x] Auth callback route still handles email confirmation and PKCE flows correctly
+- [x] No remaining references to Google OAuth in application code (only `next/font/google` import, which is unrelated)
 
 ---
 
 ### Summary
 
-- **Acceptance Criteria:** 15/15 PASSED
-- **Edge Cases:** 5/6 passed, 1 partial pass (EC-1: Google OAuth email detection -- Low severity, accepted limitation)
-- **Previously Reported Bugs (BUG-1 through BUG-18):** 16 FIXED, 1 PARTIALLY FIXED (BUG-13 in-memory store acknowledged, BUG-16 improved but see BUG-19), 1 UNCHANGED (BUG-EC1 accepted)
-- **New Bugs Found:** 3
-  - Medium: 1 (BUG-20: missing server-side password length validation)
-  - Low: 2 (BUG-19: color contrast still below AA, BUG-21: unvalidated redirectTo)
+- **Acceptance Criteria:** 14/14 PASSED (AC-5 Google OAuth marked N/A -- removed by architecture decision)
+- **Edge Cases:** 3/3 applicable passed (EC-1, EC-2, EC-5 marked N/A -- related to removed Google OAuth)
+- **Previously Reported Bugs (BUG-1 through BUG-26, BUG-EC1):**
+  - 19 FIXED (BUG-1 through BUG-11, BUG-14 through BUG-18, BUG-20, BUG-25, BUG-26)
+  - 2 PARTIALLY FIXED (BUG-13 in-memory store, BUG-19 color contrast -- dashboard only, BUG-21 redirectTo -- pathname checked but not hostname)
+  - 2 N/A (BUG-12, BUG-EC1 -- Google OAuth removed)
+  - 1 SUPERSEDED (BUG-16 -- replaced by BUG-19)
+- **New Bugs Found:** 2
+  - Medium: 1 (BUG-28: no error handling for network failures in form submissions)
+  - Low: 1 (BUG-27: redirectTo hostname not validated)
 - **Total Open Bugs:** 4 (0 critical, 0 high, 1 medium, 3 low)
-  - BUG-19 (Low): Color contrast below WCAG AA
-  - BUG-20 (Medium): No server-side password length validation
-  - BUG-21 (Low): Unvalidated redirectTo parameter
-  - BUG-EC1 (Low): Generic OAuth email message
-- **Security:** Strong. All critical and high-severity issues from previous runs are fixed. Rate limiting now covers all 6 auth endpoints server-side. Open redirect is protected. User enumeration is prevented. BUG-20 (missing server-side password validation) is the only actionable security gap and should be fixed before deployment per the project's own security rules.
+  - BUG-28 (Medium): Network failure leaves forms frozen -- fix before deployment
+  - BUG-27 (Low): redirectTo hostname not validated -- fix in next sprint (mitigated by Supabase allowlist)
+  - BUG-19 (Low): Dashboard color contrast below WCAG AA -- nice to have
+  - BUG-13 (Low): In-memory rate limit store -- fix when scaling
+- **Security:** Strong. All previous critical, high, and medium security issues are resolved. The new BUG-27 is a defense-in-depth concern mitigated by Supabase's Redirect URLs allowlist. Rate limiting covers all auth endpoints. Open redirect is protected on the callback route. User enumeration is prevented on all relevant endpoints. No XSS vectors found. CSRF is handled by JSON-only API routes and Supabase SDK.
 - **Build:** PASS
 - **Lint:** PASS
-- **Production Ready:** YES (conditionally -- fix BUG-20 first)
-- **Recommendation:** Fix BUG-20 (server-side password validation) before deployment. It directly violates the project's security rules and is a straightforward fix (add Zod validation to the register and reset-password API routes). The 3 low-severity bugs are cosmetic or defense-in-depth improvements that can be addressed in the next sprint.
+- **Production Ready:** NO -- BUG-28 (medium) must be fixed first
+- **Recommendation:** Fix BUG-28 by wrapping all client-side `fetch()` calls in try/catch blocks with appropriate error messaging and `setLoading(false)` in a finally clause. This affects 5 form handlers across 4 pages. After fixing BUG-28, the feature will be production-ready. BUG-27, BUG-19, and BUG-13 can be addressed in subsequent sprints.
 
 ## Deployment
 _To be added by /deploy_
