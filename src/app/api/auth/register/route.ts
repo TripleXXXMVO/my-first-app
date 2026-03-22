@@ -9,29 +9,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Server configuration error." }, { status: 500 });
   }
 
-  let body: { email?: string; password?: string; redirectTo?: string };
+  const { origin } = new URL(request.url);
+  const redirectTo = `${origin}/api/auth/callback`;
+
+  let body: { email?: string; password?: string };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { email, password, redirectTo } = body;
+  const { email, password } = body;
   if (!email || !password) {
     return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
   }
   if (password.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
-  }
-  if (redirectTo) {
-    try {
-      const parsed = new URL(redirectTo);
-      if (!parsed.pathname.startsWith("/api/auth/callback")) {
-        return NextResponse.json({ error: "Invalid redirect URL." }, { status: 400 });
-      }
-    } catch {
-      return NextResponse.json({ error: "Invalid redirect URL." }, { status: 400 });
-    }
   }
 
   const cookieStore = await cookies();
