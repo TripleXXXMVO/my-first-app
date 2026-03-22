@@ -9,6 +9,10 @@ const config: Config = {
   ],
   theme: {
   	extend: {
+  		fontFamily: {
+  			heading: ['var(--font-heading)', 'Plus Jakarta Sans', 'sans-serif'],
+  			body: ['var(--font-body)', 'Roboto', 'sans-serif'],
+  		},
   		colors: {
   			background: 'hsl(var(--background))',
   			foreground: 'hsl(var(--foreground))',
