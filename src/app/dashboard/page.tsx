@@ -12,7 +12,7 @@ export default function DashboardPage() {
       <div className="flex min-h-screen items-center justify-center bg-[#F6F0FF]">
         <div className="text-center">
           <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-[#DAC0FF] border-t-[#B580FF]" />
-          <p className="mt-4 font-body text-sm text-[#222222]/60">Loading...</p>
+          <p className="mt-4 font-body text-sm text-[#6b6b6b]">Loading...</p>
         </div>
       </div>
     );
@@ -42,7 +42,7 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="hidden font-body text-sm text-[#222222]/60 sm:inline">
+            <span className="hidden font-body text-sm text-[#6b6b6b] sm:inline">
               {user?.email}
             </span>
             <Button
@@ -63,7 +63,7 @@ export default function DashboardPage() {
           <h1 className="font-heading text-2xl font-bold text-[#222222]">
             Welcome to your dashboard
           </h1>
-          <p className="mt-2 font-body text-sm text-[#222222]/60">
+          <p className="mt-2 font-body text-sm text-[#6b6b6b]">
             {user?.email
               ? `Signed in as ${user.email}`
               : "Your workspace is ready."}
