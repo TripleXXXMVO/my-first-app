@@ -6,8 +6,14 @@ const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
 export function isRateLimited(ip: string): boolean {
   const now = Date.now();
+
+  // Purge all expired entries to prevent unbounded memory growth
+  for (const [key, val] of rateLimitMap) {
+    if (now > val.resetAt) rateLimitMap.delete(key);
+  }
+
   const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
+  if (!entry) {
     rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return false;
   }
