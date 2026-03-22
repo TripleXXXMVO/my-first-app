@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { registerSchema, type RegisterFormValues } from "@/lib/validations/auth";
 import { AuthLayout } from "@/components/auth/AuthLayout";
-import { GoogleOAuthButton } from "@/components/auth/GoogleOAuthButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -87,12 +86,12 @@ export default function RegisterPage() {
         description="We sent a confirmation link to your email address. Click the link to activate your account."
       >
         <div className="space-y-4 text-center">
-          <p className="font-body text-sm text-[#222222]/60">
+          <p className="font-body text-sm text-[#6b6b6b]">
             Didn&apos;t receive the email? Check your spam folder or resend below.
           </p>
           {resendMessage && (
             <p
-              className={`text-sm font-medium ${resendMessage.startsWith("Could") ? "text-[#FF4F4F]" : "text-[#5b57a2]"}`}
+              className={`text-sm font-medium ${resendMessage.startsWith("Could") ? "text-red-700" : "text-[#5b57a2]"}`}
               role="status"
             >
               {resendMessage}
@@ -147,7 +146,7 @@ export default function RegisterPage() {
                     {...field}
                   />
                 </FormControl>
-                <FormMessage className="text-[#FF4F4F]" />
+                <FormMessage className="text-red-700" />
               </FormItem>
             )}
           />
@@ -169,7 +168,7 @@ export default function RegisterPage() {
                     {...field}
                   />
                 </FormControl>
-                <FormMessage className="text-[#FF4F4F]" />
+                <FormMessage className="text-red-700" />
               </FormItem>
             )}
           />
@@ -191,13 +190,13 @@ export default function RegisterPage() {
                     {...field}
                   />
                 </FormControl>
-                <FormMessage className="text-[#FF4F4F]" />
+                <FormMessage className="text-red-700" />
               </FormItem>
             )}
           />
 
           {serverError && (
-            <p className="text-sm font-medium text-[#FF4F4F]" role="alert">
+            <p className="text-sm font-medium text-red-700" role="alert">
               {serverError}
             </p>
           )}
@@ -212,18 +211,8 @@ export default function RegisterPage() {
         </form>
       </Form>
 
-      {/* Divider */}
-      <div className="my-6 flex items-center gap-3">
-        <div className="h-px flex-1 bg-[#DAC0FF]/40" />
-        <span className="font-body text-xs text-[#767676]">OR</span>
-        <div className="h-px flex-1 bg-[#DAC0FF]/40" />
-      </div>
-
-      {/* Google OAuth */}
-      <GoogleOAuthButton label="Sign up with Google" />
-
       {/* Login link */}
-      <p className="mt-6 text-center font-body text-sm text-[#222222]/60">
+      <p className="mt-6 text-center font-body text-sm text-[#6b6b6b]">
         Already have an account?{" "}
         <Link
           href="/login"

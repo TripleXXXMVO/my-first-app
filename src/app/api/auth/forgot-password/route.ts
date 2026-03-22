@@ -20,6 +20,16 @@ export async function POST(request: Request) {
   if (!email) {
     return NextResponse.json({ error: "Email is required." }, { status: 400 });
   }
+  if (redirectTo) {
+    try {
+      const parsed = new URL(redirectTo);
+      if (!parsed.pathname.startsWith("/reset-password")) {
+        return NextResponse.json({ error: "Invalid redirect URL." }, { status: 400 });
+      }
+    } catch {
+      return NextResponse.json({ error: "Invalid redirect URL." }, { status: 400 });
+    }
+  }
 
   const cookieStore = await cookies();
   const supabase = createServerClient(url, key, {

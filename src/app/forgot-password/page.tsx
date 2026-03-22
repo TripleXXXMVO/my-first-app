@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
         description={`We sent a password reset link to ${sentEmail}`}
       >
         <div className="space-y-4 text-center">
-          <p className="font-body text-sm text-[#222222]/60">
+          <p className="font-body text-sm text-[#6b6b6b]">
             Click the link in the email to reset your password. The link expires
             in 1 hour.
           </p>
@@ -130,7 +130,7 @@ export default function ForgotPasswordPage() {
         </form>
       </Form>
 
-      <p className="mt-6 text-center font-body text-sm text-[#222222]/60">
+      <p className="mt-6 text-center font-body text-sm text-[#6b6b6b]">
         Remember your password?{" "}
         <Link
           href="/login"

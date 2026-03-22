@@ -23,6 +23,16 @@ export async function POST(request: Request) {
   if (password.length < 8) {
     return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
   }
+  if (redirectTo) {
+    try {
+      const parsed = new URL(redirectTo);
+      if (!parsed.pathname.startsWith("/api/auth/callback")) {
+        return NextResponse.json({ error: "Invalid redirect URL." }, { status: 400 });
+      }
+    } catch {
+      return NextResponse.json({ error: "Invalid redirect URL." }, { status: 400 });
+    }
+  }
 
   const cookieStore = await cookies();
   const supabase = createServerClient(url, key, {
@@ -47,9 +57,8 @@ export async function POST(request: Request) {
   if (error) {
     const msg = error.message.toLowerCase();
     if (msg.includes("already") || msg.includes("registered") || msg.includes("exists")) {
-      // BUG-EC1: covers both password-registered and Google OAuth-linked emails
       return NextResponse.json(
-        { error: "This email is already registered. Try signing in or use Google." },
+        { error: "This email is already registered. Try signing in instead." },
         { status: 409 }
       );
     }

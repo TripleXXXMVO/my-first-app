@@ -37,7 +37,7 @@ export function AuthLayout({ children, title, description }: AuthLayoutProps) {
             {title}
           </h1>
           {description && (
-            <p className="mt-2 font-body text-sm text-[#222222]/60">
+            <p className="mt-2 font-body text-sm text-[#6b6b6b]">
               {description}
             </p>
           )}

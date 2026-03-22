@@ -101,7 +101,7 @@ export default function ResetPasswordPage() {
                     {...field}
                   />
                 </FormControl>
-                <FormMessage className="text-[#FF4F4F]" />
+                <FormMessage className="text-red-700" />
               </FormItem>
             )}
           />
@@ -123,14 +123,14 @@ export default function ResetPasswordPage() {
                     {...field}
                   />
                 </FormControl>
-                <FormMessage className="text-[#FF4F4F]" />
+                <FormMessage className="text-red-700" />
               </FormItem>
             )}
           />
 
           {serverError && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-[#FF4F4F]" role="alert">
+              <p className="text-sm font-medium text-red-700" role="alert">
                 {serverError}
               </p>
               {serverError.includes("expired") && (
@@ -154,7 +154,7 @@ export default function ResetPasswordPage() {
         </form>
       </Form>
 
-      <p className="mt-6 text-center font-body text-sm text-[#222222]/60">
+      <p className="mt-6 text-center font-body text-sm text-[#6b6b6b]">
         <Link
           href="/login"
           className="font-medium text-[#5b57a2] underline hover:text-[#292673]"
