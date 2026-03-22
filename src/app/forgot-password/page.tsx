@@ -64,12 +64,21 @@ export default function ForgotPasswordPage() {
           <Button
             variant="outline"
             className="w-full border-[#DAC0FF]/60 font-body text-sm text-[#5b57a2] hover:bg-[#F6F0FF]"
-            onClick={() => {
-              setEmailSent(false);
-              form.reset();
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true);
+              await fetch("/api/auth/forgot-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  email: sentEmail,
+                  redirectTo: `${window.location.origin}/reset-password`,
+                }),
+              });
+              setLoading(false);
             }}
           >
-            Resend email
+            {loading ? "Sending..." : "Resend email"}
           </Button>
           <Link
             href="/login"

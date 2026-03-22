@@ -20,6 +20,9 @@ export async function POST(request: Request) {
   if (!password) {
     return NextResponse.json({ error: "Password is required." }, { status: 400 });
   }
+  if (password.length < 8) {
+    return NextResponse.json({ error: "Password must be at least 8 characters." }, { status: 400 });
+  }
 
   const cookieStore = await cookies();
   const supabase = createServerClient(url, key, {
