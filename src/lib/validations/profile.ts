@@ -6,7 +6,7 @@ export const profileSchema = z.object({
     .trim()
     .min(2, "Display name must be at least 2 characters")
     .max(50, "Display name must be 50 characters or less")
-    .refine((v) => !/<[^>]+>/.test(v), "Display name cannot contain HTML."),
+    .refine((v) => !/[<>&"']/.test(v), "Display name cannot contain special characters (< > & \" ')."),
 });
 
 export type ProfileFormValues = z.infer<typeof profileSchema>;

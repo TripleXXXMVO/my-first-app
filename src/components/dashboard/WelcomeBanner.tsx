@@ -1,3 +1,7 @@
+"use client";
+
+import { useState, useEffect } from "react";
+
 function getGreeting(): string {
   const hour = new Date().getHours();
   if (hour < 12) return "Good morning";
@@ -10,7 +14,13 @@ interface WelcomeBannerProps {
 }
 
 export function WelcomeBanner({ displayName }: WelcomeBannerProps) {
-  const greeting = getGreeting();
+  // Compute greeting client-side so it uses the user's local timezone, not the server's.
+  // "Hello" is the SSR/initial value to avoid a hydration mismatch.
+  const [greeting, setGreeting] = useState("Hello");
+
+  useEffect(() => {
+    setGreeting(getGreeting());
+  }, []);
 
   return (
     <div className="rounded-xl border border-[#DAC0FF]/30 bg-white p-6 shadow-sm">

@@ -7,14 +7,15 @@ const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 const profileRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const PROFILE_RATE_LIMIT_MAX = 30;
 
-export function isProfileRateLimited(ip: string): boolean {
+export function isProfileRateLimited(ip: string, endpoint: string): boolean {
   const now = Date.now();
   for (const [key, val] of profileRateLimitMap) {
     if (now > val.resetAt) profileRateLimitMap.delete(key);
   }
-  const entry = profileRateLimitMap.get(ip);
+  const key = `${ip}:${endpoint}`;
+  const entry = profileRateLimitMap.get(key);
   if (!entry) {
-    profileRateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    profileRateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
     return false;
   }
   entry.count += 1;

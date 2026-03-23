@@ -1,6 +1,6 @@
 # PROJ-2: User Profile & Dashboard
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-03-20
 **Last Updated:** 2026-03-23
 
@@ -202,7 +202,22 @@ All API routes implemented (see Backend Implementation Notes below).
 - `SUPABASE_SERVICE_ROLE_KEY` (server-only, required for account deletion)
 
 ## QA Test Results
-_To be added by /qa_
+**Completed:** 2026-03-23
+
+### Result: 12/12 Acceptance Criteria PASSED — all 10 bugs fixed
+
+| Bug | Severity | Description | Status |
+|-----|----------|-------------|--------|
+| BUG-1 | Medium | `useUnsavedChanges` monkey-patched `history.pushState` using instance value, risking wrapper stacking | Fixed — now saves `History.prototype.pushState` as canonical reference |
+| BUG-2 | Low | OAuth provider check in `ChangePasswordForm` was dead code after Google OAuth removal | Fixed — block removed |
+| BUG-3 | Low | No runtime browser testing performed (code review only) | Acknowledged — verify manually in browser before deploy |
+| BUG-4 | Medium | Middleware redirected unauthenticated `/api/*` requests to `/login` instead of returning 401 | Fixed — API routes now return `401 JSON` |
+| BUG-5 | High | Display name XSS validation only checked for complete HTML tags `/<[^>]+>/` | Fixed — now blocks all 5 dangerous characters `/[<>&"']/` |
+| BUG-6 | Medium | Avatar storage path exposed raw user UUID in public URL | Fixed — path now uses SHA-256 hash of UUID (first 24 chars) |
+| BUG-7 | High | `DELETE /api/profile` had no password re-authentication | Fixed — requires password, verifies via `signInWithPassword` before deletion |
+| BUG-8 | High | `useForm` called after conditional early return — violated React Rules of Hooks | Fixed — hook moved unconditionally before early return |
+| BUG-9 | Low | Profile rate limit keyed by IP only — shared across all endpoints | Fixed — keyed by `${ip}:${endpoint}` |
+| BUG-10 | Low | `WelcomeBanner` greeting used server timezone | Fixed — `"use client"` + `useEffect` for browser-local time |
 
 ## Deployment
 _To be added by /deploy_

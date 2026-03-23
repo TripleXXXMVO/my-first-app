@@ -19,9 +19,10 @@ import { toast } from "sonner";
 export function DangerZone() {
   const [open, setOpen] = useState(false);
   const [confirmText, setConfirmText] = useState("");
+  const [password, setPassword] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  const canDelete = confirmText === "DELETE";
+  const canDelete = confirmText === "DELETE" && password.length > 0;
 
   async function handleDelete() {
     if (!canDelete) return;
@@ -30,6 +31,8 @@ export function DangerZone() {
     try {
       const response = await fetch("/api/profile", {
         method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
       });
 
       if (!response.ok) {
@@ -46,6 +49,7 @@ export function DangerZone() {
       toast.error(
         error instanceof Error ? error.message : "Failed to delete account"
       );
+      setPassword("");
       setDeleting(false);
     }
   }
@@ -68,6 +72,7 @@ export function DangerZone() {
           setOpen(isOpen);
           if (!isOpen) {
             setConfirmText("");
+            setPassword("");
           }
         }}>
           <DialogTrigger asChild>
@@ -89,21 +94,40 @@ export function DangerZone() {
                 action is irreversible.
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-2 py-4">
-              <label
-                htmlFor="confirm-delete"
-                className="font-body text-sm font-medium text-[#222222]"
-              >
-                Type <span className="font-bold">DELETE</span> to confirm
-              </label>
-              <Input
-                id="confirm-delete"
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                placeholder="DELETE"
-                className="focus-visible:ring-red-400"
-                autoComplete="off"
-              />
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <label
+                  htmlFor="delete-password"
+                  className="font-body text-sm font-medium text-[#222222]"
+                >
+                  Enter your password to confirm
+                </label>
+                <Input
+                  id="delete-password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Your current password"
+                  className="focus-visible:ring-red-400"
+                  autoComplete="current-password"
+                />
+              </div>
+              <div className="space-y-2">
+                <label
+                  htmlFor="confirm-delete"
+                  className="font-body text-sm font-medium text-[#222222]"
+                >
+                  Type <span className="font-bold">DELETE</span> to confirm
+                </label>
+                <Input
+                  id="confirm-delete"
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  placeholder="DELETE"
+                  className="focus-visible:ring-red-400"
+                  autoComplete="off"
+                />
+              </div>
             </div>
             <DialogFooter className="gap-2 sm:gap-0">
               <Button

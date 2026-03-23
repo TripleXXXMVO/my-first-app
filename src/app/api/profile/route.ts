@@ -3,12 +3,13 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { profileSchema } from "@/lib/validations/profile";
 import { isProfileRateLimited, getClientIp } from "@/lib/rate-limit";
+import { avatarStorageKey } from "@/lib/utils";
 
 /**
  * PATCH /api/profile — Update user display name
  */
 export async function PATCH(request: NextRequest) {
-  if (isProfileRateLimited(getClientIp(request))) {
+  if (isProfileRateLimited(getClientIp(request), "PATCH /api/profile")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 
@@ -77,7 +78,7 @@ export async function PATCH(request: NextRequest) {
  * DELETE /api/profile — Delete user account and all associated data (GDPR)
  */
 export async function DELETE(request: NextRequest) {
-  if (isProfileRateLimited(getClientIp(request))) {
+  if (isProfileRateLimited(getClientIp(request), "DELETE /api/profile")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 
@@ -96,16 +97,52 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
+  // Re-authenticate with password before allowing account deletion
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  const password = typeof body === "object" && body !== null && "password" in body
+    ? (body as { password: unknown }).password
+    : undefined;
+
+  if (typeof password !== "string" || password.length === 0) {
+    return NextResponse.json(
+      { error: "Password is required to delete your account." },
+      { status: 400 }
+    );
+  }
+
+  if (!user.email) {
+    return NextResponse.json({ error: "Unable to verify identity." }, { status: 400 });
+  }
+
+  const { error: reAuthError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password,
+  });
+
+  if (reAuthError) {
+    return NextResponse.json(
+      { error: "Incorrect password. Please try again." },
+      { status: 403 }
+    );
+  }
+
   const userId = user.id;
 
   // 1. Delete avatar files from storage (best-effort cleanup)
+  const storageKey = avatarStorageKey(userId);
   try {
     const { data: avatarFiles } = await supabase.storage
       .from("avatars")
-      .list(userId);
+      .list(storageKey);
 
     if (avatarFiles && avatarFiles.length > 0) {
-      const filePaths = avatarFiles.map((f) => `${userId}/${f.name}`);
+      const filePaths = avatarFiles.map((f) => `${storageKey}/${f.name}`);
       await supabase.storage.from("avatars").remove(filePaths);
     }
   } catch {

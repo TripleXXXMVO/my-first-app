@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isProfileRateLimited, getClientIp } from "@/lib/rate-limit";
+import { avatarStorageKey } from "@/lib/utils";
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
 const ACCEPTED_TYPES = ["image/jpeg", "image/png"];
@@ -9,7 +10,7 @@ const ACCEPTED_TYPES = ["image/jpeg", "image/png"];
  * POST /api/profile/avatar — Upload or replace the user's avatar image
  */
 export async function POST(request: NextRequest) {
-  if (isProfileRateLimited(getClientIp(request))) {
+  if (isProfileRateLimited(getClientIp(request), "POST /api/profile/avatar")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 
@@ -64,7 +65,8 @@ export async function POST(request: NextRequest) {
 
   // Determine file extension from MIME type
   const ext = file.type === "image/png" ? "png" : "jpg";
-  const filePath = `${user.id}/avatar.${ext}`;
+  const storageKey = avatarStorageKey(user.id);
+  const filePath = `${storageKey}/avatar.${ext}`;
 
   // Upload to Supabase Storage (upsert replaces previous avatar)
   const { error: uploadError } = await supabase.storage
@@ -84,7 +86,7 @@ export async function POST(request: NextRequest) {
 
   // Remove the other format to avoid orphaned files (e.g. old avatar.png when new upload is .jpg)
   const otherExt = ext === "png" ? "jpg" : "png";
-  await supabase.storage.from("avatars").remove([`${user.id}/avatar.${otherExt}`]);
+  await supabase.storage.from("avatars").remove([`${storageKey}/avatar.${otherExt}`]);
   // (ignore errors — the other format may simply not exist)
 
   // Get public URL for the uploaded avatar

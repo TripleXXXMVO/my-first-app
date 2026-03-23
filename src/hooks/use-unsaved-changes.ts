@@ -29,10 +29,12 @@ export function useUnsavedChanges(isDirty: boolean) {
     }
 
     // Block Next.js client-side navigation (Link clicks, router.push, etc.)
-    const originalPushState = history.pushState.bind(history);
+    // Save the canonical prototype method rather than the current instance value
+    // to avoid stacking wrappers if multiple libraries patch history.pushState.
+    const canonicalPushState = History.prototype.pushState as typeof history.pushState;
     history.pushState = function (...args: Parameters<typeof history.pushState>) {
       if (window.confirm(CONFIRM_MESSAGE)) {
-        return originalPushState(...args);
+        return canonicalPushState.apply(history, args);
       }
     };
 
@@ -42,7 +44,7 @@ export function useUnsavedChanges(isDirty: boolean) {
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("popstate", handlePopState);
-      history.pushState = originalPushState;
+      history.pushState = canonicalPushState;
     };
   }, [isDirty]);
 }

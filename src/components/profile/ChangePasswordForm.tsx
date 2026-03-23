@@ -26,28 +26,7 @@ export function ChangePasswordForm() {
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
 
-  // OAuth users (Google, etc.) don't have a password — hide the form
-  if (user && user.app_metadata?.provider !== "email") {
-    return (
-      <Card className="border-[#DAC0FF]/30 shadow-sm">
-        <CardHeader>
-          <CardTitle className="font-heading text-base font-semibold text-[#222222]">
-            Change Password
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="font-body text-sm text-[#6b6b6b]">
-            Your account uses{" "}
-            <span className="font-medium capitalize text-[#222222]">
-              {user.app_metadata.provider}
-            </span>{" "}
-            to sign in. Password changes are managed through your provider.
-          </p>
-        </CardContent>
-      </Card>
-    );
-  }
-
+  // Must be called unconditionally before any early return (Rules of Hooks)
   const form = useForm<ChangePasswordFormValues>({
     resolver: zodResolver(changePasswordSchema),
     defaultValues: {
