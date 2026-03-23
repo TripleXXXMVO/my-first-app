@@ -1,78 +1,39 @@
-"use client";
+import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { AppShell } from "@/components/layout/AppShell";
+import { WelcomeBanner } from "@/components/dashboard/WelcomeBanner";
+import { StatsRow } from "@/components/dashboard/StatsRow";
+import { RecentTasksList } from "@/components/dashboard/RecentTasksList";
+import { EmptyState } from "@/components/dashboard/EmptyState";
 
-import React from "react";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { Button } from "@/components/ui/button";
+export default async function DashboardPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-export default function DashboardPage() {
-  const { user, loading, signOut } = useAuth();
+  if (!user) redirect("/login");
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#F6F0FF]">
-        <div className="text-center">
-          <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-[#DAC0FF] border-t-[#B580FF]" />
-          <p className="mt-4 font-body text-sm text-[#6b6b6b]">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  // PROJ-3 is not yet built, so we show the empty state.
+  // When PROJ-3 is implemented, these will come from the API.
+  const hasTasks = false;
+  const openTasks = 0;
+  const completedTasks = 0;
+  const recentTasks: [] = [];
+
+  const displayName = (user.user_metadata?.display_name as string | undefined) ?? "there";
 
   return (
-    <div className="min-h-screen bg-[#F6F0FF]">
-      {/* Top bar */}
-      <header className="border-b border-[#DAC0FF]/30 bg-white px-4 py-4 sm:px-6">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          <div className="flex items-center gap-3">
-            <svg
-              width="32"
-              height="32"
-              viewBox="0 0 40 40"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              aria-hidden="true"
-            >
-              <circle cx="20" cy="20" r="20" fill="#292673" />
-              <circle cx="20" cy="20" r="10" fill="#F6F0FF" />
-              <rect x="20" y="10" width="12" height="20" fill="#292673" />
-            </svg>
-            <span className="font-heading text-lg font-semibold text-[#292673]">
-              hr works
-            </span>
-          </div>
-
-          <div className="flex items-center gap-4">
-            <span className="hidden font-body text-sm text-[#6b6b6b] sm:inline">
-              {user?.email}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={signOut}
-              className="border-[#DAC0FF]/60 font-body text-sm text-[#5b57a2] hover:bg-[#F6F0FF]"
-            >
-              Sign out
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Main content */}
-      <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
-        <div className="rounded-xl border border-[#DAC0FF]/30 bg-white p-8 text-center shadow-sm">
-          <h1 className="font-heading text-2xl font-bold text-[#222222]">
-            Welcome to your dashboard
-          </h1>
-          <p className="mt-2 font-body text-sm text-[#6b6b6b]">
-            {user?.email
-              ? `Signed in as ${user.email}`
-              : "Your workspace is ready."}
-          </p>
-          <p className="mt-6 font-body text-sm text-[#767676]">
-            Task management features are coming soon.
-          </p>
-        </div>
-      </main>
-    </div>
+    <AppShell title="Dashboard">
+      <div className="mx-auto max-w-4xl space-y-6">
+        <WelcomeBanner displayName={displayName} />
+        <StatsRow openTasks={openTasks} completedTasks={completedTasks} />
+        {hasTasks ? (
+          <RecentTasksList tasks={recentTasks} />
+        ) : (
+          <EmptyState />
+        )}
+      </div>
+    </AppShell>
   );
 }

@@ -1,8 +1,8 @@
 # PROJ-2: User Profile & Dashboard
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-03-20
-**Last Updated:** 2026-03-20
+**Last Updated:** 2026-03-23
 
 ## Dependencies
 - Requires: PROJ-1 (User Authentication) — user must be logged in
@@ -137,6 +137,69 @@ Email and password changes use Supabase Auth directly — no custom API route ne
 
 ### New Packages
 None — all requirements met by the existing stack.
+
+## Frontend Implementation Notes
+**Implemented:** 2026-03-23
+
+### Components built
+- `src/components/layout/AppShell.tsx` — Shared layout wrapper with sidebar + top nav
+- `src/components/layout/AppSidebar.tsx` — Collapsible sidebar using shadcn/ui Sidebar (sheet on mobile, icon-collapsible on desktop)
+- `src/components/dashboard/WelcomeBanner.tsx` — Time-based greeting with user display name
+- `src/components/dashboard/StatsRow.tsx` — Open tasks + completed tasks stat cards
+- `src/components/dashboard/RecentTasksList.tsx` — Last N updated tasks with status badges
+- `src/components/dashboard/EmptyState.tsx` — Shown when no tasks exist (PROJ-3 not yet built), CTA disabled
+- `src/components/profile/AvatarUpload.tsx` — Click-to-upload with preview, client-side validation (JPG/PNG, 2MB max)
+- `src/components/profile/ProfileForm.tsx` — Display name edit + avatar upload + current plan badge + unsaved changes warning
+- `src/components/profile/ChangeEmailForm.tsx` — Email change via Supabase Auth (sends confirmation)
+- `src/components/profile/ChangePasswordForm.tsx` — Password change with current password verification
+- `src/components/profile/DangerZone.tsx` — Account deletion with "type DELETE to confirm" dialog
+
+### Pages updated
+- `src/app/dashboard/page.tsx` — Now uses AppShell with sidebar; shows WelcomeBanner, StatsRow, EmptyState
+- `src/app/profile/page.tsx` — New page with 3 tabs (Profile, Security, Account)
+
+### Other files
+- `src/lib/validations/profile.ts` — Zod schemas for profile, email change, password change
+- `src/hooks/use-unsaved-changes.ts` — Browser beforeunload hook for dirty form warning
+- `src/app/globals.css` — Updated sidebar CSS variables to match purple palette
+- `src/app/layout.tsx` — Added Sonner Toaster component
+
+### Design decisions
+- Purple palette preserved: #F6F0FF background, #B580FF accents, #292673 brand, #DAC0FF borders
+- Sidebar uses shadcn/ui Sidebar component with `collapsible="icon"` (collapses to icons on desktop, sheet on mobile)
+- Dashboard stats show 0 tasks since PROJ-3 is not yet built — empty state with disabled CTA
+- Mobile-first responsive design across all components
+- All forms use react-hook-form + Zod validation consistent with PROJ-1 patterns
+
+### Backend needed
+~~API routes not yet implemented: `PATCH /api/profile`, `POST /api/profile/avatar`, `DELETE /api/profile`~~
+All API routes implemented (see Backend Implementation Notes below).
+
+## Backend Implementation Notes
+**Implemented:** 2026-03-23
+
+### Database
+- `profiles` table with RLS (owner-only SELECT, INSERT, UPDATE, DELETE)
+- Indexes on `plan` and `updated_at DESC`
+- `updated_at` auto-updated via trigger
+- Auto-creation trigger on `auth.users` INSERT populates `profiles` row
+- `ON DELETE CASCADE` from `auth.users` for GDPR compliance
+- `avatars` storage bucket (public read, user-scoped write/delete)
+- Migration file: `supabase/migrations/20260323_create_profiles.sql`
+
+### API Routes
+- `PATCH /api/profile` — Update display name (Zod-validated, syncs to auth metadata)
+- `POST /api/profile/avatar` — Upload avatar (server-side file type + size validation, upsert to Storage, syncs URL to profile + auth metadata)
+- `DELETE /api/profile` — Account deletion using service role key (cleans up storage, deletes auth user, cascade-deletes profile, signs out session)
+
+### New files
+- `src/lib/supabase/admin.ts` — Server-only admin client using `SUPABASE_SERVICE_ROLE_KEY`
+- `src/app/api/profile/route.ts` — PATCH + DELETE endpoints
+- `src/app/api/profile/avatar/route.ts` — POST endpoint
+- `.env.local.example` — Documents all required env vars
+
+### Environment variables added
+- `SUPABASE_SERVICE_ROLE_KEY` (server-only, required for account deletion)
 
 ## QA Test Results
 _To be added by /qa_
