@@ -49,7 +49,94 @@
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Component Structure
+
+**`/dashboard` — Main Dashboard**
+```
+DashboardPage (Server-rendered for speed)
++-- AppShell
+    +-- TopNav (logo, user menu)
+    +-- Sidebar (navigation links)
+    +-- Main Content
+        +-- WelcomeBanner ("Good morning, [Name]")
+        +-- StatsRow
+        |   +-- OpenTasksCard (count of open tasks)
+        |   +-- CompletedTasksCard (count completed)
+        +-- RecentTasksList (last 5 updated tasks)
+        +-- EmptyState (shown when user has no tasks yet)
+            +-- CTA Button → "Create your first task"
+```
+
+**`/profile` — Profile & Settings**
+```
+ProfilePage
++-- AppShell
+    +-- Tabs ("Profile" | "Security" | "Account")
+        +-- Profile Tab
+        |   +-- AvatarUpload (click to replace, shows preview)
+        |   +-- ProfileForm
+        |       +-- DisplayNameField
+        |       +-- EmailField (read-only, links to Security tab)
+        |       +-- CurrentPlanBadge (Free / Pro)
+        |       +-- SaveButton
+        +-- Security Tab
+        |   +-- ChangeEmailForm
+        |   +-- ChangePasswordForm
+        +-- Account Tab
+            +-- DangerZone
+                +-- DeleteAccountButton → ConfirmDeleteDialog
+                    +-- "Type DELETE to confirm" input
+```
+
+### Data Model
+
+**User Profile** (`profiles` table in Supabase)
+- User ID — links to the logged-in user (auth.users)
+- Display Name — shown across the app (min. 2 characters)
+- Avatar URL — link to the uploaded image in Supabase Storage
+- Plan — "free" or "pro" (default: free)
+- Created at / Updated at — timestamps
+
+**Avatar Images** (Supabase Storage)
+- Bucket: `avatars` (publicly readable)
+- Path pattern: `avatars/{user-id}/avatar.jpg`
+- One file per user; uploading replaces the previous one
+- Accepted: JPG, PNG — Max: 2MB (enforced client-side before upload)
+
+**Dashboard Stats** (derived from tasks table — PROJ-3)
+- Count of open tasks
+- Count of completed tasks
+- Last 5 tasks sorted by most recently updated
+- When PROJ-3 is not yet built → show empty state
+
+### Tech Decisions
+
+| Decision | Choice | Why |
+|---|---|---|
+| Dashboard rendering | SSR (Server-Side Rendering) | Data loads before page is sent to browser — meets <1s requirement |
+| Profile form | React Hook Form + Zod | Already used in PROJ-1 — consistent validation, no new dependencies |
+| Avatar upload | Supabase Storage | Already in stack; provides public CDN URL automatically |
+| Email & password changes | Supabase Auth built-in | Handles confirmation emails and security — no custom logic needed |
+| Account deletion | Supabase cascade delete | One DB rule removes all user data — simplest GDPR compliance path |
+| Unsaved changes warning | Browser `beforeunload` event | Native browser prompt, zero extra code |
+| Toast notifications | Sonner (already installed) | Already wired up in PROJ-1 |
+
+### API Routes
+
+| Route | Purpose |
+|---|---|
+| `PATCH /api/profile` | Save display name |
+| `POST /api/profile/avatar` | Upload avatar to Supabase Storage |
+| `DELETE /api/profile` | Delete account + all user data (GDPR) |
+
+Email and password changes use Supabase Auth directly — no custom API route needed.
+
+### Existing shadcn/ui Components (no new installs)
+`Card`, `Button`, `Input`, `Label`, `Form`, `Avatar`, `Badge`, `Dialog`, `Tabs`, `Separator`, `Sonner`, `Skeleton`
+
+### New Packages
+None — all requirements met by the existing stack.
 
 ## QA Test Results
 _To be added by /qa_
