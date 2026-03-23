@@ -1,6 +1,6 @@
 # PROJ-3: Task Management (CRUD)
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-03-20
 **Last Updated:** 2026-03-20
 
@@ -52,7 +52,78 @@
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Komponentenstruktur
+
+```
+/tasks  (Task-Liste)
+├── TaskListHeader (Titel + "Neue Aufgabe"-Button)
+├── TaskFilterBar
+│   ├── StatusFilter (Alle / To Do / In Progress / Done)
+│   ├── PriorityFilter (Alle / Niedrig / Mittel / Hoch)
+│   └── SortControl (Fälligkeitsdatum / Priorität / Erstellt)
+├── TaskTable
+│   └── TaskRow (wiederkehrend)
+│       ├── Checkbox (schnell als "Done" markieren)
+│       ├── Titel + Beschreibung (gekürzt)
+│       ├── PriorityBadge (farbcodiert)
+│       ├── StatusBadge
+│       ├── DueDateLabel (mit Warnung wenn überfällig)
+│       └── Aktionen (Bearbeiten / Löschen)
+├── Pagination (max. 50 pro Seite)
+└── EmptyState (keine Aufgaben / keine Filterergebnisse)
+
+/tasks/new  (Aufgabe erstellen)
+└── TaskForm
+    ├── Titel (Pflichtfeld, max. 200 Zeichen)
+    ├── Beschreibung (optional, Textarea)
+    ├── Fälligkeitsdatum (optional, Datepicker)
+    ├── Priorität (Low / Medium / High)
+    ├── Status (To Do / In Progress / Done)
+    └── Speichern / Abbrechen
+
+/tasks/[id]  (Aufgabe bearbeiten)
+└── TaskForm (vorausgefüllt, gleiche Komponente wie "neu")
+    └── Löschen-Button → Bestätigungsdialog
+```
+
+### Datenmodell
+
+Jede Aufgabe enthält:
+- Eindeutige ID
+- Benutzer-ID (verknüpft mit dem eingeloggten User)
+- Titel (1–200 Zeichen, Pflichtfeld)
+- Beschreibung (optional)
+- Fälligkeitsdatum (optional)
+- Priorität: `low` / `medium` / `high` (Standard: medium)
+- Status: `todo` / `in_progress` / `done` (Standard: todo)
+- Erstellt am / Geändert am (automatisch)
+
+Gespeichert in: Supabase PostgreSQL (`tasks`-Tabelle)
+Zugriffskontrolle: RLS-Policy `auth.uid() = user_id` auf allen CRUD-Operationen
+
+### API-Routen
+
+| Route | Zweck |
+|-------|-------|
+| `GET /api/tasks` | Liste laden (mit Filter, Sortierung, Pagination) |
+| `POST /api/tasks` | Neue Aufgabe erstellen |
+| `GET /api/tasks/[id]` | Einzelne Aufgabe laden |
+| `PATCH /api/tasks/[id]` | Aufgabe bearbeiten (inkl. Quick-Toggle) |
+| `DELETE /api/tasks/[id]` | Aufgabe löschen |
+
+### Tech-Entscheidungen
+
+- **Supabase** für Datenbank — bereits in PROJ-1/2 im Einsatz
+- **RLS-Policies** auf DB-Ebene — Sicherheit direkt in der Datenbank
+- **Gleiche `TaskForm`-Komponente** für Erstellen + Bearbeiten — weniger Code
+- **Server-seitige Filterung** — Performance bei vielen Aufgaben
+- **shadcn/ui** Table, Badge, Dialog, Select, Checkbox — bereits installiert
+- **AppSidebar** bekommt neuen "Aufgaben"-Eintrag mit Link zu `/tasks`
+
+### Neue Abhängigkeiten
+
+- `date-fns` — Datumsformatierung und Überfällig-Logik
 
 ## QA Test Results
 _To be added by /qa_
