@@ -1,8 +1,8 @@
 # PROJ-4: Subscription & Payment (Freemium)
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-03-20
-**Last Updated:** 2026-03-20
+**Last Updated:** 2026-03-25
 
 ## Dependencies
 - Requires: PROJ-1 (User Authentication) — only logged-in users can subscribe
@@ -57,7 +57,79 @@
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Komponentenstruktur
+
+```
+/pricing (öffentlich)
++-- PricingHero (Überschrift + Tagline)
++-- PricingCards
+|   +-- FreePlanCard (Features, Limits, "Kostenlos starten")
+|   +-- ProPlanCard (Features, Preis, "Upgrade" Button)
++-- FeatureComparisonTable
+
+/billing/success (geschützt)
++-- SuccessBanner
++-- NextStepsCard (zurück zum Dashboard)
+
+/billing/cancel (geschützt)
++-- CancelBanner
++-- ReturnToPricingButton
+
+/profile (bestehend – Erweiterung)
++-- BillingSection (NEU)
+    +-- CurrentPlanBadge (Free / Pro)
+    +-- NextBillingDate
+    +-- ManageSubscriptionButton → Stripe Billing Portal
+
+UpgradePrompt (Modal – überall einsetzbar)
++-- PlanLimitMessage ("Limit von 20 Tasks erreicht")
++-- UpgradeButton → /pricing
+```
+
+### Datenmodell
+
+**Neue Tabelle: `subscriptions`**
+- Stripe Customer ID (eindeutige Stripe-Kennung)
+- Stripe Subscription ID (aktives Abo bei Stripe)
+- Plan (free oder pro)
+- Status (active / canceled / past_due)
+- Aktuelle Periode endet am (Datum für "Zugang bis...")
+- Verknüpft mit: users-Tabelle (1:1)
+
+**Bestehende Tabellen:** keine Änderung nötig
+- Task-Limit (20 für Free) wird serverseitig beim Erstellen geprüft
+
+### API-Routen
+
+| Route | Zweck |
+|---|---|
+| `POST /api/stripe/checkout` | Erstellt Stripe Checkout Session |
+| `POST /api/stripe/webhook` | Empfängt Stripe-Events (Zahlung, Kündigung, Fehlschlag) |
+| `POST /api/stripe/portal` | Erstellt Billing Portal Session |
+
+### Datenfluss
+
+1. **Upgrade:** User → Checkout API → Stripe → Webhook → DB aktualisiert → /billing/success
+2. **Verwaltung/Kündigung:** User → Portal API → Stripe Billing Portal → Webhook → DB aktualisiert
+3. **Fehlgeschlagene Zahlung:** Stripe Webhook → status = "past_due" + E-Mail durch Stripe
+4. **Freemium-Limit:** Task #21 → Server prüft Plan → Free: 402 → Frontend zeigt UpgradePrompt
+
+### Tech-Entscheidungen
+
+| Entscheidung | Warum |
+|---|---|
+| Stripe Hosted Checkout | PCI-Compliance bei Stripe – keine Kartendaten im eigenen System |
+| Stripe Billing Portal | Kein eigenes Kündigungs-UI nötig |
+| Webhook-Validierung serverseitig | Plan-Status nur über verifizierte Stripe-Signatur aktualisierbar |
+| Soft Limits bei Downgrade | Tasks bleiben erhalten – nur neue Erstellung wird blockiert |
+| Supabase RLS | Nur eigener Subscription-Eintrag lesbar |
+
+### Abhängigkeiten
+
+| Paket | Zweck |
+|---|---|
+| `stripe` | Stripe Node.js SDK |
 
 ## QA Test Results
 _To be added by /qa_
