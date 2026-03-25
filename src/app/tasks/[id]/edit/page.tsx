@@ -1,9 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
-import { DashboardContent } from "@/components/dashboard/DashboardContent";
+import { TaskEditPage } from "@/components/tasks/TaskEditPage";
 
-export default async function DashboardPage() {
+export default async function EditTaskPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -11,11 +15,11 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  const displayName = (user.user_metadata?.display_name as string | undefined) ?? "there";
+  const { id } = await params;
 
   return (
-    <AppShell title="Dashboard">
-      <DashboardContent displayName={displayName} />
+    <AppShell title="Edit Task">
+      <TaskEditPage taskId={id} />
     </AppShell>
   );
 }

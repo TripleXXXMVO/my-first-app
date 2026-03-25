@@ -1,8 +1,8 @@
 # PROJ-3: Task Management (CRUD)
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-03-20
-**Last Updated:** 2026-03-20
+**Last Updated:** 2026-03-24
 
 ## Dependencies
 - Requires: PROJ-1 (User Authentication) — tasks are owned by logged-in users
@@ -126,7 +126,25 @@ Zugriffskontrolle: RLS-Policy `auth.uid() = user_id` auf allen CRUD-Operationen
 - `date-fns` — Datumsformatierung und Überfällig-Logik
 
 ## QA Test Results
-_To be added by /qa_
+
+**Tested:** 2026-03-24 | **Fixed:** 2026-03-25
+
+### Bugs Fixed (10/10)
+
+| Bug | Severity | Fix |
+|-----|----------|-----|
+| BUG-1 | LOW | Removed "In Review" status — only To Do / In Progress / Done remain. Migration converts existing data. |
+| BUG-2 | MEDIUM | Added `priority_order` generated column (high=3, medium=2, low=1) + migration. API uses it for sort. |
+| BUG-3 | LOW | Added read-only `TaskDetailPage` at `/tasks/[id]`. Edit moved to `/tasks/[id]/edit`. |
+| BUG-4 | LOW | DELETE uses `.select("id")` to detect missing rows and returns 404 accordingly. |
+| BUG-5 | HIGH | Replaced `fetchAllTasks()` with new `GET /api/tasks/stats` endpoint (server-side COUNT). |
+| BUG-6 | MEDIUM | `GET /api/tasks` validates `status` and `priority` params against allowed enums before querying. |
+| BUG-7 | MEDIUM | Added `.max(5000)` to description field in `createTaskSchema` and `updateTaskSchema`. |
+| BUG-8 | HIGH | Added `GET /api/tasks/[id]` handler. `TaskEditPage` and `TaskDetailPage` fetch task via API. |
+| BUG-9 | LOW | Sidebar uses `startsWith(item.href)` so `/tasks/new` and `/tasks/[id]` highlight the Tasks nav item. |
+| BUG-10 | HIGH | Dashboard stats use `GET /api/tasks/stats` — accurate for any number of tasks. |
+
+### Production Ready: YES (pending migration deployment)
 
 ## Deployment
 _To be added by /deploy_

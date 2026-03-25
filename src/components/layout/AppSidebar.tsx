@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, User, LogOut } from "lucide-react";
+import { LayoutDashboard, User, LogOut, ClipboardList } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -24,6 +25,11 @@ const navItems = [
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Tasks",
+    href: "/tasks",
+    icon: ClipboardList,
   },
   {
     title: "Profile",
@@ -51,23 +57,23 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-4">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <svg
-            width="32"
-            height="32"
-            viewBox="0 0 40 40"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            aria-hidden="true"
-            className="shrink-0"
-          >
-            <circle cx="20" cy="20" r="20" fill="#292673" />
-            <circle cx="20" cy="20" r="10" fill="#F6F0FF" />
-            <rect x="20" y="10" width="12" height="20" fill="#292673" />
-          </svg>
-          <span className="font-heading text-lg font-semibold text-[#292673] group-data-[collapsible=icon]:hidden">
-            hr works
-          </span>
+        <Link href="/dashboard" className="flex items-center">
+          <Image
+            src="/hrworks-logo.png"
+            alt="hr works"
+            width={140}
+            height={32}
+            className="h-8 w-auto shrink-0 group-data-[collapsible=icon]:hidden"
+            priority
+          />
+          <Image
+            src="/hrworks-logo.png"
+            alt="hr works"
+            width={32}
+            height={32}
+            className="hidden h-8 w-8 shrink-0 object-cover object-left group-data-[collapsible=icon]:block"
+            priority
+          />
         </Link>
       </SidebarHeader>
 
@@ -84,7 +90,7 @@ export function AppSidebar() {
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
-                    isActive={pathname === item.href}
+                    isActive={pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href))}
                     tooltip={item.title}
                     className="font-body text-sm text-[#5b57a2] data-[active=true]:bg-[#DAC0FF]/40 data-[active=true]:text-[#292673]"
                   >

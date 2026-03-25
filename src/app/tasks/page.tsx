@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/AppShell";
-import { DashboardContent } from "@/components/dashboard/DashboardContent";
+import { TaskListPage } from "@/components/tasks/TaskListPage";
 
-export default async function DashboardPage() {
+export default async function TasksPage() {
   const supabase = await createClient();
   const {
     data: { user },
@@ -11,11 +11,9 @@ export default async function DashboardPage() {
 
   if (!user) redirect("/login");
 
-  const displayName = (user.user_metadata?.display_name as string | undefined) ?? "there";
-
   return (
-    <AppShell title="Dashboard">
-      <DashboardContent displayName={displayName} />
+    <AppShell title="Tasks">
+      <TaskListPage />
     </AppShell>
   );
 }

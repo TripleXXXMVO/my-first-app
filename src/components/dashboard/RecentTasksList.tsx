@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 export interface RecentTask {
   id: string;
   title: string;
-  status: "open" | "in_progress" | "completed";
+  status: "todo" | "in_progress" | "in_review" | "done";
   updatedAt: string;
 }
 
@@ -20,16 +20,20 @@ const statusConfig: Record<
   RecentTask["status"],
   { label: string; className: string }
 > = {
-  open: {
-    label: "Open",
+  todo: {
+    label: "To Do",
     className: "border-[#DAC0FF] bg-[#F6F0FF] text-[#5b57a2]",
   },
   in_progress: {
     label: "In Progress",
     className: "border-amber-300 bg-amber-50 text-amber-700",
   },
-  completed: {
-    label: "Completed",
+  in_review: {
+    label: "In Review",
+    className: "border-blue-300 bg-blue-50 text-blue-700",
+  },
+  done: {
+    label: "Done",
     className: "border-emerald-300 bg-emerald-50 text-emerald-700",
   },
 };

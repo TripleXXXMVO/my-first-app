@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ClipboardList } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -20,14 +21,10 @@ export function EmptyState() {
         </p>
         <Button
           className="mt-6 bg-[#B580FF] font-body text-sm font-semibold text-white hover:bg-[#5b57a2]"
-          disabled
-          aria-label="Create your first task (coming soon)"
+          asChild
         >
-          Create your first task
+          <Link href="/tasks/new">Create your first task</Link>
         </Button>
-        <p className="mt-2 font-body text-xs text-[#767676]">
-          Task management is coming soon
-        </p>
       </CardContent>
     </Card>
   );
