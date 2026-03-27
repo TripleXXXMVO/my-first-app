@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, User, LogOut, ClipboardList } from "lucide-react";
+import { LayoutDashboard, User, LogOut, ClipboardList, CreditCard } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -30,6 +30,11 @@ const navItems = [
     title: "Tasks",
     href: "/tasks",
     icon: ClipboardList,
+  },
+  {
+    title: "Pricing",
+    href: "/pricing",
+    icon: CreditCard,
   },
   {
     title: "Profile",

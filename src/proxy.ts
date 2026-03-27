@@ -1,11 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { isRateLimited, getClientIp } from "@/lib/rate-limit";
-// Workaround: Turbopack dev mode doesn't apply the webpack template wrapper,
-// so Next.js can't find the edge adapter. Re-export it as `default` so that
-// next-server.js can use it as `adapterFn`.
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-export { adapter as default } from "next/dist/server/web/adapter";
 
 const publicRoutes = ["/login", "/register", "/forgot-password", "/reset-password"];
 

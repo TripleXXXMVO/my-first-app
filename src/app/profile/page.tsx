@@ -7,6 +7,7 @@ import { ProfileForm } from "@/components/profile/ProfileForm";
 import { ChangeEmailForm } from "@/components/profile/ChangeEmailForm";
 import { ChangePasswordForm } from "@/components/profile/ChangePasswordForm";
 import { DangerZone } from "@/components/profile/DangerZone";
+import { BillingSection } from "@/components/billing/BillingSection";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
@@ -49,6 +50,12 @@ export default function ProfilePage() {
               Security
             </TabsTrigger>
             <TabsTrigger
+              value="billing"
+              className="rounded-none border-b-2 border-transparent px-4 pb-3 pt-2 font-body text-sm font-medium text-[#6b6b6b] data-[state=active]:border-[#B580FF] data-[state=active]:text-[#292673] data-[state=active]:shadow-none"
+            >
+              Billing
+            </TabsTrigger>
+            <TabsTrigger
               value="account"
               className="rounded-none border-b-2 border-transparent px-4 pb-3 pt-2 font-body text-sm font-medium text-[#6b6b6b] data-[state=active]:border-[#B580FF] data-[state=active]:text-[#292673] data-[state=active]:shadow-none"
             >
@@ -63,6 +70,10 @@ export default function ProfilePage() {
           <TabsContent value="security" className="mt-0 space-y-6">
             <ChangeEmailForm />
             <ChangePasswordForm />
+          </TabsContent>
+
+          <TabsContent value="billing" className="mt-0">
+            <BillingSection />
           </TabsContent>
 
           <TabsContent value="account" className="mt-0">
