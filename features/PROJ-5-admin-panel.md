@@ -1,8 +1,8 @@
 # PROJ-5: Admin Panel
 
-## Status: Planned
+## Status: In Progress
 **Created:** 2026-03-20
-**Last Updated:** 2026-03-20
+**Last Updated:** 2026-03-27
 
 ## Dependencies
 - Requires: PROJ-1 (User Authentication) — admin must be authenticated
@@ -52,7 +52,85 @@
 <!-- Sections below are added by subsequent skills -->
 
 ## Tech Design (Solution Architect)
-_To be added by /architecture_
+
+### Component Structure
+
+```
+/admin layout (AdminShell — wraps AppShell, adds admin sidebar nav)
+|
++-- /admin (AdminDashboardPage)
+|   +-- StatsGrid (4 cards: Total Users, New This Week, Free, Pro)
+|   +-- RecentActivityFeed (last 10 audit log entries)
+|
++-- /admin/users (AdminUsersPage)
+|   +-- AdminUserFilterBar (search by email, filter by plan)
+|   +-- AdminUserTable (email, name, plan badge, join date, last login)
+|   |   +-- PlanBadge (reuses existing Badge component)
+|   +-- TaskPagination (reuse existing Pagination component)
+|
++-- /admin/users/[id] (AdminUserDetailPage)
+    +-- UserInfoCard (avatar, email, name, join date)
+    +-- PlanSection (current plan + Change Plan selector)
+    +-- AccountStatusSection (Active/Deactivated toggle)
+    +-- DangerZone (Delete User button + confirmation dialog)
+    +-- AuditLogSection (actions taken on this user)
+```
+
+### Data Model
+
+**Existing tables — extended:**
+- `profiles` table: add `role` column (`user` | `admin`). Set directly in DB only — not changeable via UI.
+- `subscriptions` table (from PROJ-4): reused as-is for plan data.
+
+**New table — `admin_audit_log`:**
+- `id` — unique identifier
+- `admin_id` — which admin performed the action
+- `action` — what happened (e.g. "changed_plan", "deactivated_user", "deleted_user")
+- `target_user_id` — which user was affected
+- `metadata` — extra details (e.g. old/new plan values)
+- `created_at` — timestamp
+
+### Route & API Design
+
+| Route | Purpose | Protection |
+|---|---|---|
+| `/admin` | Stats dashboard | Admin role, server-checked |
+| `/admin/users` | Paginated user list | Admin role, server-checked |
+| `/admin/users/[id]` | User detail + actions | Admin role, server-checked |
+| `GET /api/admin/stats` | Fetch platform stats | Server verifies admin role |
+| `GET /api/admin/users` | Paginated + filtered user list | Server verifies admin role |
+| `GET /api/admin/users/[id]` | Single user detail | Server verifies admin role |
+| `PATCH /api/admin/users/[id]` | Change plan or deactivate user | Server verifies admin role |
+| `DELETE /api/admin/users/[id]` | Permanently delete user | Server verifies admin role |
+
+**Security is layered:**
+1. Next.js Middleware — checks `admin` role on every `/admin/*` request, redirects non-admins to `/dashboard`
+2. API Routes — independently verify admin role before any DB write (defence in depth)
+
+### Tech Decisions
+
+| Decision | Choice | Why |
+|---|---|---|
+| Layout | Extend existing `AppShell` + `AppSidebar` | Consistent app chrome, no duplicate code |
+| Data fetching | Server Components | Admin data never exposed in browser network tab |
+| User table | Reuse `Table` + `Pagination` shadcn components | Already installed, same pattern as Task list |
+| Search/Filter | Database-side filtering via API query params | Handles large user counts without loading all data |
+| Confirmation dialogs | Reuse `AlertDialog` shadcn component | Already installed, consistent UX |
+| Plan change | `Select` dropdown + server PATCH | Simple manual override, no Stripe call needed |
+
+### New Components to Build
+
+| Component | Location |
+|---|---|
+| `AdminShell` (admin nav wrapper) | `src/components/admin/AdminShell.tsx` |
+| `AdminStatsGrid` | `src/components/admin/AdminStatsGrid.tsx` |
+| `AdminUserTable` | `src/components/admin/AdminUserTable.tsx` |
+| `AdminUserFilterBar` | `src/components/admin/AdminUserFilterBar.tsx` |
+| `AdminUserDetailPage` | `src/components/admin/AdminUserDetailPage.tsx` |
+| `AdminAuditLog` | `src/components/admin/AdminAuditLog.tsx` |
+
+### Dependencies
+No new packages required — all needed UI components and Supabase are already installed.
 
 ## QA Test Results
 _To be added by /qa_
