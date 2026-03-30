@@ -1,10 +1,12 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, User, LogOut, ClipboardList, CreditCard } from "lucide-react";
+import { LayoutDashboard, User, LogOut, ClipboardList, CreditCard, ShieldCheck, Users } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { createClient } from "@/lib/supabase/client";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Sidebar,
@@ -43,9 +45,36 @@ const navItems = [
   },
 ];
 
+const adminNavItems = [
+  {
+    title: "Admin Dashboard",
+    href: "/admin",
+    icon: ShieldCheck,
+  },
+  {
+    title: "User Management",
+    href: "/admin/users",
+    icon: Users,
+  },
+];
+
 export function AppSidebar() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const supabase = createClient();
+    supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single()
+      .then(({ data }) => {
+        setIsAdmin(data?.role === "admin");
+      });
+  }, [user]);
 
   const userInitials = user?.user_metadata?.display_name
     ? user.user_metadata.display_name
@@ -109,6 +138,33 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {isAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel className="font-body text-xs uppercase tracking-wider text-[#5b57a2]/60">
+              Admin
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {adminNavItems.map((item) => (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))}
+                      tooltip={item.title}
+                      className="font-body text-sm text-[#5b57a2] data-[active=true]:bg-[#DAC0FF]/40 data-[active=true]:text-[#292673]"
+                    >
+                      <Link href={item.href}>
+                        <item.icon className="size-4" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarSeparator />

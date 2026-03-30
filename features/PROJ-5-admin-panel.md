@@ -132,6 +132,68 @@
 ### Dependencies
 No new packages required — all needed UI components and Supabase are already installed.
 
+## Frontend Implementation Notes
+**Implemented:** 2026-03-30
+
+### Files Created
+- `src/lib/admin.ts` — Admin types, API utilities, and audit log formatter
+- `src/hooks/use-admin.ts` — Three hooks: `useAdminStats`, `useAdminUsers`, `useAdminUserDetail`
+- `src/components/admin/AdminStatsGrid.tsx` — 4-card stats grid (Total Users, New This Week, Free, Pro)
+- `src/components/admin/AdminAuditLog.tsx` — Scrollable audit log with action badges
+- `src/components/admin/AdminUserFilterBar.tsx` — Search by email + plan filter with debounce
+- `src/components/admin/AdminUserTable.tsx` — Paginated user table with avatar, plan badge, status dot
+- `src/components/admin/AdminUserDetailPage.tsx` — User info, plan change, activate/deactivate, delete with confirmation
+- `src/components/admin/AdminDashboardContent.tsx` — Dashboard page client component
+- `src/components/admin/AdminUsersContent.tsx` — Users list page client component
+- `src/app/admin/page.tsx` — Admin dashboard route (server-side role check)
+- `src/app/admin/users/page.tsx` — User management route (server-side role check)
+- `src/app/admin/users/[id]/page.tsx` — User detail route (server-side role check)
+
+### Files Modified
+- `src/components/layout/AppSidebar.tsx` — Added conditional admin nav section (visible only to admin role)
+
+### Design Decisions
+- All three admin pages perform server-side role checks before rendering (redirect non-admins to /dashboard)
+- Sidebar admin section loads role via client-side Supabase query (defence in depth — server check is primary)
+- Reused existing shadcn/ui Table, Pagination, Badge, AlertDialog, Select, Switch components
+- Search input uses 400ms debounce to avoid excessive API calls
+- User detail page shows plan change via Select dropdown, account toggle via Switch, and delete via AlertDialog
+
+## Backend Implementation Notes
+**Implemented:** 2026-03-30
+
+### Database Migration
+- File: `supabase/migrations/20260330_admin_panel.sql`
+- Extended `profiles` table with `role` (user|admin) and `is_active` (boolean) columns
+- Created `admin_audit_log` table with RLS (admin-only read/insert, no update/delete — immutable)
+- Added indexes on: `profiles.role`, `profiles.is_active`, `admin_audit_log.admin_id`, `admin_audit_log.target_user_id`, `admin_audit_log.created_at`, `admin_audit_log.action`
+- RLS policies: admins can read/update/delete all profiles; admins can read/insert audit logs
+
+### API Routes Created
+- `GET /api/admin/stats` — Platform stats (total users, new this week, free/pro counts) + optional audit log
+- `GET /api/admin/users` — Paginated user list with search (email) and plan filter, Zod-validated query params
+- `GET /api/admin/users/[id]` — Single user detail with audit log entries (emails resolved via batch query)
+- `PATCH /api/admin/users/[id]` — Change plan or activate/deactivate user; checks for active Stripe subscription before plan change (returns 409 with warning)
+- `DELETE /api/admin/users/[id]` — Hard-delete from auth.users (service role key) + cascade to profiles; blocks self-deletion
+- `PATCH /api/admin/users/[id]/role` — Change user role (user <-> admin); blocks self-role-change
+
+### Supporting Files Created/Modified
+- `src/lib/admin-auth.ts` — Shared admin auth helper (verifies session + admin role from profiles)
+- `src/lib/validations/admin.ts` — Zod schemas for all admin endpoints (updateUserSchema, updateUserRoleSchema, userIdSchema, adminUserListQuerySchema)
+- `src/lib/rate-limit.ts` — Added `isAdminRateLimited()` with 60 requests / 15 min window
+- `src/lib/admin.ts` — Added `updateAdminUserRole()` fetch helper + "changed_role" to audit action formatter
+- `.env.local.example` — Updated comment for SUPABASE_SERVICE_ROLE_KEY usage
+
+### Security Design
+- All admin API routes verify admin role server-side via `requireAdmin()` (defence in depth with RLS)
+- Rate limiting: 60 requests per 15 minutes for admin endpoints (more generous than regular users)
+- Zod validation on all write endpoints (PATCH plan/status, PATCH role)
+- UUID validation on all path parameters
+- Self-deletion and self-role-change blocked with explicit error messages
+- Active Stripe subscription check returns 409 warning before manual plan override
+- Audit log entries are immutable (no UPDATE/DELETE RLS policies)
+- Hard-delete uses service role key (never exposed to browser)
+
 ## QA Test Results
 _To be added by /qa_
 

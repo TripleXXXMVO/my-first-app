@@ -10,6 +10,10 @@ const PROFILE_RATE_LIMIT_MAX = 30;
 const taskRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const TASK_RATE_LIMIT_MAX = 60;
 
+const adminRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const ADMIN_RATE_LIMIT_MAX = 60;
+const ADMIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+
 export function isProfileRateLimited(ip: string, endpoint: string): boolean {
   const now = Date.now();
   for (const [key, val] of profileRateLimitMap) {
@@ -38,6 +42,21 @@ export function isTaskRateLimited(ip: string, endpoint: string): boolean {
   }
   entry.count += 1;
   return entry.count > TASK_RATE_LIMIT_MAX;
+}
+
+export function isAdminRateLimited(ip: string, endpoint: string): boolean {
+  const now = Date.now();
+  for (const [key, val] of adminRateLimitMap) {
+    if (now > val.resetAt) adminRateLimitMap.delete(key);
+  }
+  const key = `${ip}:${endpoint}`;
+  const entry = adminRateLimitMap.get(key);
+  if (!entry) {
+    adminRateLimitMap.set(key, { count: 1, resetAt: now + ADMIN_RATE_LIMIT_WINDOW_MS });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > ADMIN_RATE_LIMIT_MAX;
 }
 
 export function isRateLimited(ip: string): boolean {
