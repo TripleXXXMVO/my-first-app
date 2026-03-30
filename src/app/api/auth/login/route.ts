@@ -35,12 +35,31 @@ export async function POST(request: Request) {
     },
   });
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data: signInData, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     return NextResponse.json(
       { error: "Invalid email or password. Please try again." },
       { status: 401 }
     );
+  }
+
+  // Check if the account has been deactivated by an admin
+  const userId = signInData.user?.id;
+  if (userId) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_active")
+      .eq("id", userId)
+      .single();
+
+    if (profile && profile.is_active === false) {
+      // Sign out immediately — a deactivated user must not receive a session
+      await supabase.auth.signOut();
+      return NextResponse.json(
+        { error: "Your account has been deactivated. Please contact support." },
+        { status: 403 }
+      );
+    }
   }
 
   return NextResponse.json({ success: true });

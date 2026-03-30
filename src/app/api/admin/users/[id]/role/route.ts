@@ -14,7 +14,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
 
-  if (isAdminRateLimited(getClientIp(request), "PATCH /api/admin/users/[id]/role")) {
+  if (await isAdminRateLimited(getClientIp(request), "PATCH /api/admin/users/[id]/role")) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       { status: 429 }

@@ -7,7 +7,7 @@ import { isTaskRateLimited, getClientIp } from "@/lib/rate-limit";
  * Uses server-side COUNT queries so stats are always accurate regardless of total task count.
  */
 export async function GET(request: NextRequest) {
-  if (isTaskRateLimited(getClientIp(request), "GET /api/tasks/stats")) {
+  if (await isTaskRateLimited(getClientIp(request), "GET /api/tasks/stats")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 

@@ -8,7 +8,7 @@ import { isTaskRateLimited, getClientIp } from "@/lib/rate-limit";
  * RLS ensures only the user's own tasks are returned.
  */
 export async function GET(request: NextRequest) {
-  if (isTaskRateLimited(getClientIp(request), "GET /api/tasks")) {
+  if (await isTaskRateLimited(getClientIp(request), "GET /api/tasks")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
  * POST /api/tasks — Create a new task for the authenticated user.
  */
 export async function POST(request: NextRequest) {
-  if (isTaskRateLimited(getClientIp(request), "POST /api/tasks")) {
+  if (await isTaskRateLimited(getClientIp(request), "POST /api/tasks")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 

@@ -1,86 +1,115 @@
 import { type NextRequest } from "next/server";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
+// Shared window: 15 minutes
+const WINDOW_MS = 15 * 60 * 1000;
+const WINDOW = "15 m" as const;
+
+// ─── Upstash Redis (persistent across restarts & instances) ─────────────────
+// Activated when UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN are set.
+// Falls back to in-memory when not configured (local dev / single-instance).
+
+function buildLimiter(maxRequests: number, prefix: string): Ratelimit | null {
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  return new Ratelimit({
+    redis: new Redis({ url, token }),
+    limiter: Ratelimit.slidingWindow(maxRequests, WINDOW),
+    prefix: `rl:${prefix}`,
+  });
+}
+
+// Lazily initialised so process.env is read at request time, not module load
+let _authLimiter: Ratelimit | null | undefined;
+let _profileLimiter: Ratelimit | null | undefined;
+let _taskLimiter: Ratelimit | null | undefined;
+let _adminLimiter: Ratelimit | null | undefined;
+
+const getAuthLimiter = () => (_authLimiter ??= buildLimiter(10, "auth"));
+const getProfileLimiter = () => (_profileLimiter ??= buildLimiter(30, "profile"));
+const getTaskLimiter = () => (_taskLimiter ??= buildLimiter(60, "task"));
+const getAdminLimiter = () => (_adminLimiter ??= buildLimiter(60, "admin"));
+
+// ─── In-memory fallback ──────────────────────────────────────────────────────
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 10;
-const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
-
 const profileRateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const PROFILE_RATE_LIMIT_MAX = 30;
-
 const taskRateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const TASK_RATE_LIMIT_MAX = 60;
-
 const adminRateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const ADMIN_RATE_LIMIT_MAX = 60;
-const ADMIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
 
-export function isProfileRateLimited(ip: string, endpoint: string): boolean {
+function checkInMemory(
+  map: Map<string, { count: number; resetAt: number }>,
+  key: string,
+  max: number
+): boolean {
   const now = Date.now();
-  for (const [key, val] of profileRateLimitMap) {
-    if (now > val.resetAt) profileRateLimitMap.delete(key);
+  for (const [k, v] of map) {
+    if (now > v.resetAt) map.delete(k);
   }
-  const key = `${ip}:${endpoint}`;
-  const entry = profileRateLimitMap.get(key);
+  const entry = map.get(key);
   if (!entry) {
-    profileRateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    map.set(key, { count: 1, resetAt: now + WINDOW_MS });
     return false;
   }
   entry.count += 1;
-  return entry.count > PROFILE_RATE_LIMIT_MAX;
+  return entry.count > max;
 }
 
-export function isTaskRateLimited(ip: string, endpoint: string): boolean {
-  const now = Date.now();
-  for (const [key, val] of taskRateLimitMap) {
-    if (now > val.resetAt) taskRateLimitMap.delete(key);
+// ─── Public API ──────────────────────────────────────────────────────────────
+
+export async function isRateLimited(ip: string): Promise<boolean> {
+  const limiter = getAuthLimiter();
+  if (limiter) {
+    const { success } = await limiter.limit(ip);
+    return !success;
   }
-  const key = `${ip}:${endpoint}`;
-  const entry = taskRateLimitMap.get(key);
-  if (!entry) {
-    taskRateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
-  }
-  entry.count += 1;
-  return entry.count > TASK_RATE_LIMIT_MAX;
+  return checkInMemory(rateLimitMap, ip, 10);
 }
 
-export function isAdminRateLimited(ip: string, endpoint: string): boolean {
-  const now = Date.now();
-  for (const [key, val] of adminRateLimitMap) {
-    if (now > val.resetAt) adminRateLimitMap.delete(key);
-  }
+export async function isProfileRateLimited(
+  ip: string,
+  endpoint: string
+): Promise<boolean> {
+  const limiter = getProfileLimiter();
   const key = `${ip}:${endpoint}`;
-  const entry = adminRateLimitMap.get(key);
-  if (!entry) {
-    adminRateLimitMap.set(key, { count: 1, resetAt: now + ADMIN_RATE_LIMIT_WINDOW_MS });
-    return false;
+  if (limiter) {
+    const { success } = await limiter.limit(key);
+    return !success;
   }
-  entry.count += 1;
-  return entry.count > ADMIN_RATE_LIMIT_MAX;
+  return checkInMemory(profileRateLimitMap, key, 30);
 }
 
-export function isRateLimited(ip: string): boolean {
-  const now = Date.now();
-
-  // Purge all expired entries to prevent unbounded memory growth
-  for (const [key, val] of rateLimitMap) {
-    if (now > val.resetAt) rateLimitMap.delete(key);
+export async function isTaskRateLimited(
+  ip: string,
+  endpoint: string
+): Promise<boolean> {
+  const limiter = getTaskLimiter();
+  const key = `${ip}:${endpoint}`;
+  if (limiter) {
+    const { success } = await limiter.limit(key);
+    return !success;
   }
+  return checkInMemory(taskRateLimitMap, key, 60);
+}
 
-  const entry = rateLimitMap.get(ip);
-  if (!entry) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false;
+export async function isAdminRateLimited(
+  ip: string,
+  endpoint: string
+): Promise<boolean> {
+  const limiter = getAdminLimiter();
+  const key = `${ip}:${endpoint}`;
+  if (limiter) {
+    const { success } = await limiter.limit(key);
+    return !success;
   }
-  entry.count += 1;
-  return entry.count > RATE_LIMIT_MAX;
+  return checkInMemory(adminRateLimitMap, key, 60);
 }
 
 export function getClientIp(request: NextRequest): string {
-  // request.ip is set by Next.js/Vercel to the verified real client IP
   const reqIp = (request as NextRequest & { ip?: string }).ip;
   if (reqIp) return reqIp;
-  // Fallback: take the last IP in x-forwarded-for (rightmost = added by the outermost trusted proxy)
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
     const ips = forwarded.split(",").map((s) => s.trim()).filter(Boolean);

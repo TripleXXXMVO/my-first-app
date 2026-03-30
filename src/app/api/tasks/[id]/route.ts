@@ -16,7 +16,7 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  if (isTaskRateLimited(getClientIp(request), "GET /api/tasks/[id]")) {
+  if (await isTaskRateLimited(getClientIp(request), "GET /api/tasks/[id]")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 
@@ -63,7 +63,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
 
-  if (isTaskRateLimited(getClientIp(request), "PATCH /api/tasks/[id]")) {
+  if (await isTaskRateLimited(getClientIp(request), "PATCH /api/tasks/[id]")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 
@@ -141,7 +141,7 @@ export async function DELETE(
 ) {
   const { id } = await params;
 
-  if (isTaskRateLimited(getClientIp(request), "DELETE /api/tasks/[id]")) {
+  if (await isTaskRateLimited(getClientIp(request), "DELETE /api/tasks/[id]")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 

@@ -8,7 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Optionally includes recent audit log entries when ?include=audit_log.
  */
 export async function GET(request: NextRequest) {
-  if (isAdminRateLimited(getClientIp(request), "GET /api/admin/stats")) {
+  if (await isAdminRateLimited(getClientIp(request), "GET /api/admin/stats")) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       { status: 429 }

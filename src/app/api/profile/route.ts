@@ -9,7 +9,7 @@ import { avatarStorageKey } from "@/lib/utils";
  * PATCH /api/profile — Update user display name
  */
 export async function PATCH(request: NextRequest) {
-  if (isProfileRateLimited(getClientIp(request), "PATCH /api/profile")) {
+  if (await isProfileRateLimited(getClientIp(request), "PATCH /api/profile")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 
@@ -78,7 +78,7 @@ export async function PATCH(request: NextRequest) {
  * DELETE /api/profile — Delete user account and all associated data (GDPR)
  */
 export async function DELETE(request: NextRequest) {
-  if (isProfileRateLimited(getClientIp(request), "DELETE /api/profile")) {
+  if (await isProfileRateLimited(getClientIp(request), "DELETE /api/profile")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 

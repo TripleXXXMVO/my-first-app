@@ -21,7 +21,7 @@ export async function proxy(request: NextRequest) {
     AUTH_POST_ROUTES.some((route) => request.nextUrl.pathname.startsWith(route))
   ) {
     const ip = getClientIp(request);
-    if (isRateLimited(ip)) {
+    if (await isRateLimited(ip)) {
       return new NextResponse("Too many requests. Please try again later.", {
         status: 429,
         headers: { "Retry-After": "900" },
@@ -73,6 +73,32 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+
+  // For page routes, enforce two profile checks in a single DB query:
+  //   1. Deactivated users are signed out and redirected to login
+  //   2. Non-admin users are blocked from /admin/* routes (defence in depth on top of page-level checks)
+  if (user && !pathname.startsWith("/api/")) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("is_active, role")
+      .eq("id", user.id)
+      .single();
+
+    if (profile && profile.is_active === false) {
+      await supabase.auth.signOut();
+      const url = request.nextUrl.clone();
+      url.pathname = "/login";
+      url.searchParams.set("error", "deactivated");
+      return NextResponse.redirect(url);
+    }
+
+    if (pathname.startsWith("/admin") && (!profile || profile.role !== "admin")) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard";
+      url.searchParams.set("error", "unauthorized");
+      return NextResponse.redirect(url);
+    }
+  }
 
   // If user is authenticated and tries to access a public auth route, redirect to dashboard
   if (user && publicRoutes.some((route) => pathname.startsWith(route))) {

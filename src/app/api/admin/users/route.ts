@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-auth";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { isAdminRateLimited, getClientIp } from "@/lib/rate-limit";
 import { adminUserListQuerySchema } from "@/lib/validations/admin";
 import { ADMIN_USERS_PER_PAGE } from "@/lib/admin";
@@ -9,7 +10,7 @@ import { ADMIN_USERS_PER_PAGE } from "@/lib/admin";
  * Supports: ?search=email&plan=free|pro&page=1
  */
 export async function GET(request: NextRequest) {
-  if (isAdminRateLimited(getClientIp(request), "GET /api/admin/users")) {
+  if (await isAdminRateLimited(getClientIp(request), "GET /api/admin/users")) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       { status: 429 }
@@ -39,8 +40,35 @@ export async function GET(request: NextRequest) {
   const from = (page - 1) * perPage;
   const to = from + perPage - 1;
 
+  // If plan filter is requested, pre-fetch the relevant user IDs from subscriptions
+  // so we can apply the filter at the DB level before pagination (not client-side).
+  let planFilterIds: string[] | null = null;
+  if (plan) {
+    if (plan === "pro") {
+      // Pro users: have an active "pro" subscription
+      const { data: proSubs } = await supabase
+        .from("subscriptions")
+        .select("user_id")
+        .eq("plan", "pro")
+        .eq("status", "active");
+      planFilterIds = proSubs?.map((s) => s.user_id) ?? [];
+      if (planFilterIds.length === 0) {
+        return NextResponse.json({ users: [], total: 0 });
+      }
+    } else {
+      // Free users: do NOT have an active "pro" subscription
+      const { data: proSubs } = await supabase
+        .from("subscriptions")
+        .select("user_id")
+        .eq("plan", "pro")
+        .eq("status", "active");
+      const proIds = proSubs?.map((s) => s.user_id) ?? [];
+      // planFilterIds = null means "no exclusion needed" (all users are free)
+      planFilterIds = proIds.length > 0 ? proIds : null;
+    }
+  }
+
   // Build query — select profiles with optional subscription join
-  // We use a left join to subscriptions to get the user's plan
   let query = supabase
     .from("profiles")
     .select(
@@ -48,15 +76,28 @@ export async function GET(request: NextRequest) {
       { count: "exact" }
     );
 
-  // Search by email (case-insensitive partial match)
+  // Search by email (case-insensitive partial match).
+  // Escape SQL LIKE special characters so they are treated as literals:
+  //   \  →  \\   (must be first to avoid double-escaping)
+  //   %  →  \%
+  //   _  →  \_
   if (search) {
-    query = query.ilike("email", `%${search}%`);
+    const escaped = search.replace(/\\/g, "\\\\").replace(/%/g, "\\%").replace(/_/g, "\\_");
+    query = query.ilike("email", `%${escaped}%`);
+  }
+
+  // Apply plan filter at DB level before pagination
+  if (plan === "pro" && planFilterIds) {
+    query = query.in("id", planFilterIds);
+  } else if (plan === "free" && planFilterIds) {
+    // Exclude users who have a pro subscription
+    query = query.not("id", "in", `(${planFilterIds.join(",")})`);
   }
 
   // Sort by created_at descending (newest first)
   query = query.order("created_at", { ascending: false });
 
-  // Pagination
+  // Pagination — applied after all filters so count and results are correct
   query = query.range(from, to);
 
   const { data: profiles, count, error } = await query;
@@ -72,29 +113,41 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ users: [], total: count ?? 0 });
   }
 
-  // Fetch active subscriptions for these users to determine plan
   const userIds = profiles.map((p) => p.id);
-  const { data: subscriptions } = await supabase
-    .from("subscriptions")
-    .select("user_id, plan, status")
-    .in("user_id", userIds)
-    .eq("status", "active");
+
+  // Fetch active subscriptions and last_sign_in_at in parallel
+  const adminClient = createAdminClient();
+  const [subscriptionsResult, authUsersResult] = await Promise.all([
+    supabase
+      .from("subscriptions")
+      .select("user_id, plan, status")
+      .in("user_id", userIds)
+      .eq("status", "active"),
+    Promise.all(
+      userIds.map((uid) => adminClient.auth.admin.getUserById(uid))
+    ),
+  ]);
 
   // Build a map of user_id -> plan
   const planMap = new Map<string, string>();
-  if (subscriptions) {
-    for (const sub of subscriptions) {
+  if (subscriptionsResult.data) {
+    for (const sub of subscriptionsResult.data) {
       planMap.set(sub.user_id, sub.plan);
     }
   }
 
-  // Fetch last_sign_in_at from auth.users via admin API is not possible with anon key,
-  // so we'll use the profiles data we have. If last_sign_in_at isn't in profiles,
-  // we'll return null. The admin client could be used but it's heavy for a list query.
-  // For now, we include it as null and it can be populated if the profiles table stores it.
+  // Build a map of user_id -> last_sign_in_at
+  const lastSignInMap = new Map<string, string | null>();
+  for (const result of authUsersResult) {
+    if (result.data.user) {
+      lastSignInMap.set(
+        result.data.user.id,
+        result.data.user.last_sign_in_at ?? null
+      );
+    }
+  }
 
-  // Assemble user objects
-  let users = profiles.map((p) => ({
+  const users = profiles.map((p) => ({
     id: p.id,
     email: p.email,
     display_name: p.display_name,
@@ -103,16 +156,11 @@ export async function GET(request: NextRequest) {
     plan: (planMap.get(p.id) as "free" | "pro") ?? "free",
     is_active: p.is_active,
     created_at: p.created_at,
-    last_sign_in_at: null as string | null,
+    last_sign_in_at: lastSignInMap.get(p.id) ?? null,
   }));
-
-  // Filter by plan (post-query since plan comes from subscriptions table)
-  if (plan) {
-    users = users.filter((u) => u.plan === plan);
-  }
 
   return NextResponse.json({
     users,
-    total: plan ? users.length : (count ?? 0),
+    total: count ?? 0,
   });
 }

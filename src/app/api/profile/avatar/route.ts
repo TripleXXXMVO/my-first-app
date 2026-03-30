@@ -10,7 +10,7 @@ const ACCEPTED_TYPES = ["image/jpeg", "image/png"];
  * POST /api/profile/avatar — Upload or replace the user's avatar image
  */
 export async function POST(request: NextRequest) {
-  if (isProfileRateLimited(getClientIp(request), "POST /api/profile/avatar")) {
+  if (await isProfileRateLimited(getClientIp(request), "POST /api/profile/avatar")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
 

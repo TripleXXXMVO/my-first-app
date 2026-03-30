@@ -13,7 +13,7 @@ export async function GET(
 ) {
   const { id } = await params;
 
-  if (isAdminRateLimited(getClientIp(request), "GET /api/admin/users/[id]")) {
+  if (await isAdminRateLimited(getClientIp(request), "GET /api/admin/users/[id]")) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       { status: 429 }
@@ -94,6 +94,12 @@ export async function GET(
     target_user_email: profile.email,
   }));
 
+  // Fetch last_sign_in_at from auth.users via admin client
+  const adminClient = createAdminClient();
+  const { data: authUser } = await adminClient.auth.admin.getUserById(
+    profile.id
+  );
+
   return NextResponse.json({
     id: profile.id,
     email: profile.email,
@@ -103,7 +109,7 @@ export async function GET(
     plan,
     is_active: profile.is_active,
     created_at: profile.created_at,
-    last_sign_in_at: null,
+    last_sign_in_at: authUser?.user?.last_sign_in_at ?? null,
     audit_log: enrichedAuditLog,
   });
 }
@@ -118,7 +124,7 @@ export async function PATCH(
 ) {
   const { id } = await params;
 
-  if (isAdminRateLimited(getClientIp(request), "PATCH /api/admin/users/[id]")) {
+  if (await isAdminRateLimited(getClientIp(request), "PATCH /api/admin/users/[id]")) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       { status: 429 }
@@ -177,16 +183,19 @@ export async function PATCH(
       .maybeSingle();
 
     if (activeSub && activeSub.stripe_subscription_id) {
+      // Do NOT expose the internal Stripe subscription ID in the response
       return NextResponse.json(
         {
           error:
             "This user has an active Stripe subscription. Cancel it in Stripe first before manually changing the plan.",
           warning: true,
-          stripe_subscription_id: activeSub.stripe_subscription_id,
         },
         { status: 409 }
       );
     }
+
+    // Capture old plan for audit log before making any changes
+    const oldPlan = activeSub?.plan ?? "free";
 
     // If no active Stripe subscription, update the subscription record or create one
     if (activeSub) {
@@ -204,12 +213,13 @@ export async function PATCH(
       });
     }
 
-    // Log the plan change
+    // Log the plan change, including the previous plan for a complete audit trail
     await supabase.from("admin_audit_log").insert({
       admin_id: adminId,
       action: "changed_plan",
       target_user_id: id,
       metadata: {
+        old_plan: oldPlan,
         new_plan: updates.plan,
       },
     });
@@ -280,7 +290,7 @@ export async function DELETE(
 ) {
   const { id } = await params;
 
-  if (isAdminRateLimited(getClientIp(request), "DELETE /api/admin/users/[id]")) {
+  if (await isAdminRateLimited(getClientIp(request), "DELETE /api/admin/users/[id]")) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
       { status: 429 }
@@ -316,16 +326,6 @@ export async function DELETE(
     return NextResponse.json({ error: "User not found." }, { status: 404 });
   }
 
-  // Log the deletion BEFORE deleting (so we have the target_user_id reference)
-  await supabase.from("admin_audit_log").insert({
-    admin_id: adminId,
-    action: "deleted_user",
-    target_user_id: id,
-    metadata: {
-      deleted_email: targetProfile.email,
-    },
-  });
-
   // Hard delete: remove from auth.users using service role key.
   // ON DELETE CASCADE on profiles will remove the profile row automatically.
   const adminClient = createAdminClient();
@@ -337,6 +337,19 @@ export async function DELETE(
       { status: 500 }
     );
   }
+
+  // Write audit log AFTER confirmed deletion to prevent phantom entries on failure.
+  // The user no longer exists in auth.users, so target_user_id must be null (FK constraint).
+  // The deleted user's ID and email are preserved in metadata for the audit trail.
+  await supabase.from("admin_audit_log").insert({
+    admin_id: adminId,
+    action: "deleted_user",
+    target_user_id: null,
+    metadata: {
+      deleted_user_id: id,
+      deleted_email: targetProfile.email,
+    },
+  });
 
   return NextResponse.json({ success: true });
 }
