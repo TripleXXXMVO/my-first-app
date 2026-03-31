@@ -89,6 +89,7 @@ export function TaskForm({ mode, initialData, onSubmit, onDelete }: TaskFormProp
 
   const priority = watch("priority");
   const status = watch("status");
+  const description = watch("description");
 
   const handleFormSubmit = async (data: TaskFormValues) => {
     try {
@@ -147,7 +148,11 @@ export function TaskForm({ mode, initialData, onSubmit, onDelete }: TaskFormProp
               {...register("description")}
               className="min-h-[100px] font-body"
               rows={4}
+              maxLength={5000}
             />
+            <p className={`font-body text-xs text-right ${(description?.length ?? 0) >= 4800 ? "text-red-500" : "text-muted-foreground"}`}>
+              {description?.length ?? 0} / 5000
+            </p>
           </div>
 
           {/* Due Date */}

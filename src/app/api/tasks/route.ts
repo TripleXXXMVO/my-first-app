@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createTaskSchema } from "@/lib/validations/task";
-import { isTaskRateLimited, getClientIp } from "@/lib/rate-limit";
+import { isTaskRateLimited, getClientIp, isValidOrigin } from "@/lib/rate-limit";
 
 /**
  * GET /api/tasks — List authenticated user's tasks with optional filters, sorting, and pagination.
@@ -80,6 +80,9 @@ export async function GET(request: NextRequest) {
  * POST /api/tasks — Create a new task for the authenticated user.
  */
 export async function POST(request: NextRequest) {
+  if (!isValidOrigin(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   if (await isTaskRateLimited(getClientIp(request), "POST /api/tasks")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }

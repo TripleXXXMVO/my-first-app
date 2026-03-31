@@ -9,7 +9,12 @@ export const createTaskSchema = z.object({
   description: z.string().max(5000, "Description must be 5000 characters or less").default(""),
   status: z.enum(["todo", "in_progress", "done"]).default("todo"),
   priority: z.enum(["low", "medium", "high"]).default("medium"),
-  due_date: z.string().nullable().default(null),
+  due_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "due_date must be a valid date in YYYY-MM-DD format")
+    .refine((v) => !isNaN(Date.parse(v)), "due_date must be a valid date")
+    .nullable()
+    .default(null),
 });
 
 export const updateTaskSchema = z.object({
@@ -22,7 +27,12 @@ export const updateTaskSchema = z.object({
   description: z.string().max(5000, "Description must be 5000 characters or less").optional(),
   status: z.enum(["todo", "in_progress", "done"]).optional(),
   priority: z.enum(["low", "medium", "high"]).optional(),
-  due_date: z.string().nullable().optional(),
+  due_date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "due_date must be a valid date in YYYY-MM-DD format")
+    .refine((v) => !isNaN(Date.parse(v)), "due_date must be a valid date")
+    .nullable()
+    .optional(),
 });
 
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;

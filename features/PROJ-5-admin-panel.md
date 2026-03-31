@@ -277,7 +277,6 @@ No new packages required — all needed UI components and Supabase are already i
 
 #### EC-2: Admin tries to change plan of user with active Stripe subscription
 - [x] Returns HTTP 409 with warning: "This user has an active Stripe subscription. Cancel it in Stripe first."
-- [x] Includes `stripe_subscription_id` in response for reference
 
 #### EC-3: Search query returns no results
 - [x] Empty state: "No users found matching your filters."
@@ -290,7 +289,7 @@ No new packages required — all needed UI components and Supabase are already i
 #### EC-5: Non-admin discovers /admin route
 - [x] Server-side role check returns redirect
 - [x] API routes return 403 Forbidden
-- [ ] BUG-1 impacts first-line defense (middleware missing admin check)
+- [x] BUG-1: **FIXED** — Middleware now checks admin role on `/admin/*` routes
 
 ### Security Audit Results
 
@@ -432,16 +431,47 @@ No new packages required — all needed UI components and Supabase are already i
 - [x] Billing routes unchanged
 - [x] Subscriptions table read by admin APIs but not modified destructively
 
-### Summary
-- **Acceptance Criteria:** 10/12 passed (AC-4, AC-5, AC-9 have functional bugs)
+### Summary (Round 1)
+- **Acceptance Criteria:** 10/12 passed (AC-4, AC-5, AC-9 had functional bugs)
 - **Edge Cases:** 4/5 passed (EC-4 impacted by BUG-3)
-- **Bugs Found:** 10 total (0 critical, 2 high, 4 medium, 4 low)
-  - High: BUG-3 (client-side plan filter breaks pagination), BUG-4 (deactivated users can still log in)
-  - Medium: BUG-1 (no middleware admin check), BUG-2 (last_sign_in_at always null), BUG-5 (RLS recursion risk), BUG-8 (Stripe ID leak), BUG-9 (phantom audit entry)
-  - Low: BUG-6 (LIKE wildcards), BUG-7 (in-memory rate limit), BUG-10 (missing old_plan in audit)
-- **Security:** 3 issues found (BUG-1 middleware gap, BUG-6 LIKE wildcards, BUG-8 Stripe ID leak)
-- **Build:** PASS (zero TypeScript errors, zero compile errors)
-- **Production Ready:** NO -- 2 high-severity bugs and 3 medium bugs should be fixed first
+- **Bugs Found:** 10 total (0 critical, 2 high, 4 medium, 4 low) — all fixed in Round 1
+- **Production Ready:** NO — fixed in Round 1
+
+---
+
+## QA Test Results — Round 2
+
+**Tested:** 2026-03-31
+**Round 1 Verification:** 10/10 bugs confirmed fixed
+**Acceptance Criteria:** 12/12 PASS
+**Edge Cases:** 5/5 PASS
+
+### Bugs Found (Round 2)
+
+#### BUG-11: ~~`admin_audit_log.admin_id` has contradictory `NOT NULL` + `ON DELETE SET NULL`~~ **FIXED**
+- **Severity:** Medium — **Status: Fixed 2026-03-31**
+- **Fix:** Removed `NOT NULL` from `admin_id` in `supabase/migrations/20260330_admin_panel.sql`. Added patch migration `20260331_fix_admin_bugs.sql` (`ALTER TABLE admin_audit_log ALTER COLUMN admin_id DROP NOT NULL`).
+
+#### BUG-12: ~~N+1 auth API calls for `last_sign_in_at` on user list~~ **FIXED**
+- **Severity:** Low — **Status: Fixed 2026-03-31**
+- **Fix:** Added `get_users_last_sign_in(user_ids UUID[])` SQL function (SECURITY DEFINER) in `20260331_fix_admin_bugs.sql`. `GET /api/admin/users` now calls `adminClient.rpc("get_users_last_sign_in", { user_ids })` — a single query instead of 50 parallel `getUserById()` calls.
+
+#### BUG-13: ~~`changed_role` action missing from audit log color map~~ **FIXED**
+- **Severity:** Low — **Status: Fixed 2026-03-31**
+- **Fix:** Added `changed_role: "bg-violet-100 text-violet-700"` to `actionColors` in `src/components/admin/AdminAuditLog.tsx`.
+
+#### BUG-14: ~~Stale doc — EC-2 still references `stripe_subscription_id` in 409 response~~ **FIXED**
+- **Severity:** Low (docs only) — **Status: Fixed 2026-03-31**
+- **Fix:** Removed the stale `stripe_subscription_id` reference from EC-2 in this spec.
+
+#### BUG-15: ~~Stale doc — EC-5 shows unchecked BUG-1 item despite fix~~ **FIXED**
+- **Severity:** Low (docs only) — **Status: Fixed 2026-03-31**
+- **Fix:** Marked EC-5 BUG-1 checkbox as checked in this spec.
+
+### Round 2 Summary
+- **New Bugs Found:** 5 (0 critical, 0 high, 1 medium, 4 low) — all fixed
+- **Security:** PASS — BUG-11 (the only security-adjacent finding) now fixed
+- **Production Ready:** YES — no critical or high bugs remain
 
 ## Deployment
 _To be added by /deploy_

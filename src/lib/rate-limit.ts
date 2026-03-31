@@ -107,13 +107,24 @@ export async function isAdminRateLimited(
   return checkInMemory(adminRateLimitMap, key, 60);
 }
 
+export function isValidOrigin(request: NextRequest): boolean {
+  const origin = request.headers.get("origin");
+  if (!origin) return true; // server-to-server or same-origin requests omit Origin
+  const host = request.headers.get("host");
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
 export function getClientIp(request: NextRequest): string {
   const reqIp = (request as NextRequest & { ip?: string }).ip;
   if (reqIp) return reqIp;
   const forwarded = request.headers.get("x-forwarded-for");
   if (forwarded) {
     const ips = forwarded.split(",").map((s) => s.trim()).filter(Boolean);
-    return ips[ips.length - 1] ?? "unknown";
+    return ips[0] ?? "unknown";
   }
   return "unknown";
 }

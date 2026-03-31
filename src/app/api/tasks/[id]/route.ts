@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { updateTaskSchema } from "@/lib/validations/task";
-import { isTaskRateLimited, getClientIp } from "@/lib/rate-limit";
+import { isTaskRateLimited, getClientIp, isValidOrigin } from "@/lib/rate-limit";
 import { z } from "zod";
 
 const uuidSchema = z.string().uuid("Invalid task ID.");
@@ -63,6 +63,9 @@ export async function PATCH(
 ) {
   const { id } = await params;
 
+  if (!isValidOrigin(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   if (await isTaskRateLimited(getClientIp(request), "PATCH /api/tasks/[id]")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }
@@ -141,6 +144,9 @@ export async function DELETE(
 ) {
   const { id } = await params;
 
+  if (!isValidOrigin(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
   if (await isTaskRateLimited(getClientIp(request), "DELETE /api/tasks/[id]")) {
     return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
   }

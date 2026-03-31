@@ -117,15 +117,13 @@ export async function GET(request: NextRequest) {
 
   // Fetch active subscriptions and last_sign_in_at in parallel
   const adminClient = createAdminClient();
-  const [subscriptionsResult, authUsersResult] = await Promise.all([
+  const [subscriptionsResult, lastSignInResult] = await Promise.all([
     supabase
       .from("subscriptions")
       .select("user_id, plan, status")
       .in("user_id", userIds)
       .eq("status", "active"),
-    Promise.all(
-      userIds.map((uid) => adminClient.auth.admin.getUserById(uid))
-    ),
+    adminClient.rpc("get_users_last_sign_in", { user_ids: userIds }),
   ]);
 
   // Build a map of user_id -> plan
@@ -138,12 +136,12 @@ export async function GET(request: NextRequest) {
 
   // Build a map of user_id -> last_sign_in_at
   const lastSignInMap = new Map<string, string | null>();
-  for (const result of authUsersResult) {
-    if (result.data.user) {
-      lastSignInMap.set(
-        result.data.user.id,
-        result.data.user.last_sign_in_at ?? null
-      );
+  if (lastSignInResult.data) {
+    for (const row of lastSignInResult.data as {
+      id: string;
+      last_sign_in_at: string | null;
+    }[]) {
+      lastSignInMap.set(row.id, row.last_sign_in_at);
     }
   }
 
