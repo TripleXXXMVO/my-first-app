@@ -1,8 +1,8 @@
 # PROJ-4: Subscription & Payment (Freemium)
 
-## Status: In Progress
+## Status: In Review
 **Created:** 2026-03-20
-**Last Updated:** 2026-03-25
+**Last Updated:** 2026-04-05
 
 ## Dependencies
 - Requires: PROJ-1 (User Authentication) — only logged-in users can subscribe
@@ -132,7 +132,26 @@ UpgradePrompt (Modal – überall einsetzbar)
 | `stripe` | Stripe Node.js SDK |
 
 ## QA Test Results
-_To be added by /qa_
+
+**Tested:** 2026-04-05 | **Build:** PASS
+
+### Bugs Fixed (2026-04-05)
+
+| Bug | Severity | Fix |
+|-----|----------|-----|
+| BUG-1 | Medium | Added user-visible error banner in `PricingCards.tsx` for checkout failures |
+| BUG-2 | Low | Converted success page to server component; shows warning when `session_id` is absent |
+| BUG-3 | High | Added `customer.subscription.updated` webhook handler; `cancel_at_period_end=true` now keeps plan=pro with `cancelAtPeriodEnd` flag; access maintained until period end |
+| BUG-4 | Medium | Added Redis-based idempotency dedup (`stripe_event:{id}`, 7-day TTL) in webhook handler |
+| BUG-5 | Low | Added `z.object({}).strict()` Zod validation on checkout POST body |
+| BUG-6 | Medium | Added `isWebhookRateLimited` (200 req/15min) to webhook endpoint |
+| BUG-7 | Medium | Removed `stripe_customer_id` and `stripe_subscription_id` from subscription API response and `useSubscription` hook |
+| BUG-8 | Medium | Added `portalError` state and error message UI in `BillingSection.tsx` |
+| BUG-9 | Low | Extracted `FREE_TASK_LIMIT` to `src/lib/constants.ts`; removed 3 local duplicates in `TaskCreatePage`, `DashboardContent`, `TaskListPage` |
+
+### Schema Change
+- Added `cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE` column to `subscriptions` table (migration: `20260404_fix_subscriptions_cancel_at_period_end.sql`)
+- `useSubscription` hook updated: removed `stripeCustomerId`/`stripeSubscriptionId`, added `cancelAtPeriodEnd`; `isCanceled` now reflects the new field
 
 ## Deployment
 _To be added by /deploy_

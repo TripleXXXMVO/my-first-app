@@ -9,16 +9,14 @@ export interface Subscription {
   plan: SubscriptionPlan;
   status: SubscriptionStatus;
   currentPeriodEnd: string | null;
-  stripeCustomerId: string | null;
-  stripeSubscriptionId: string | null;
+  cancelAtPeriodEnd: boolean;
 }
 
 const DEFAULT_SUBSCRIPTION: Subscription = {
   plan: "free",
   status: "none",
   currentPeriodEnd: null,
-  stripeCustomerId: null,
-  stripeSubscriptionId: null,
+  cancelAtPeriodEnd: false,
 };
 
 export function useSubscription(userId: string | undefined) {
@@ -49,8 +47,7 @@ export function useSubscription(userId: string | undefined) {
         plan: data.plan ?? "free",
         status: data.status ?? "none",
         currentPeriodEnd: data.current_period_end ?? null,
-        stripeCustomerId: data.stripe_customer_id ?? null,
-        stripeSubscriptionId: data.stripe_subscription_id ?? null,
+        cancelAtPeriodEnd: data.cancel_at_period_end ?? false,
       });
     } catch (err) {
       console.error("Failed to load subscription:", err);
@@ -66,7 +63,8 @@ export function useSubscription(userId: string | undefined) {
   }, [loadSubscription]);
 
   const isPro = subscription.plan === "pro" && subscription.status === "active";
-  const isCanceled = subscription.status === "canceled";
+  // isCanceled: subscription is active but scheduled to cancel at period end
+  const isCanceled = subscription.cancelAtPeriodEnd;
   const isPastDue = subscription.status === "past_due";
 
   return {

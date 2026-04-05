@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createTaskSchema } from "@/lib/validations/task";
 import { isTaskRateLimited, getClientIp, isValidOrigin } from "@/lib/rate-limit";
+import { FREE_TASK_LIMIT } from "@/lib/stripe";
 
 /**
  * GET /api/tasks — List authenticated user's tasks with optional filters, sorting, and pagination.
@@ -113,6 +114,40 @@ export async function POST(request: NextRequest) {
   }
 
   const { title, description, status, priority, due_date } = validation.data;
+
+  // Check free plan task limit (20 tasks max for free users)
+  const { data: subscription } = await supabase
+    .from("subscriptions")
+    .select("plan, status")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const isPro =
+    subscription?.plan === "pro" && subscription?.status === "active";
+
+  if (!isPro) {
+    const { count, error: countError } = await supabase
+      .from("tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id);
+
+    if (countError) {
+      return NextResponse.json(
+        { error: "Failed to check task limit." },
+        { status: 500 }
+      );
+    }
+
+    if ((count ?? 0) >= FREE_TASK_LIMIT) {
+      return NextResponse.json(
+        {
+          error: `Free plan is limited to ${FREE_TASK_LIMIT} tasks. Upgrade to Pro for unlimited tasks.`,
+          code: "PLAN_LIMIT_EXCEEDED",
+        },
+        { status: 402 }
+      );
+    }
+  }
 
   const { data: task, error } = await supabase
     .from("tasks")

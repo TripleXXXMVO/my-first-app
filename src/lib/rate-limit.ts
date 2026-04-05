@@ -26,11 +26,16 @@ let _authLimiter: Ratelimit | null | undefined;
 let _profileLimiter: Ratelimit | null | undefined;
 let _taskLimiter: Ratelimit | null | undefined;
 let _adminLimiter: Ratelimit | null | undefined;
+let _stripeLimiter: Ratelimit | null | undefined;
+// Webhooks are called by Stripe servers — high limit to avoid blocking legitimate events
+let _webhookLimiter: Ratelimit | null | undefined;
 
 const getAuthLimiter = () => (_authLimiter ??= buildLimiter(10, "auth"));
 const getProfileLimiter = () => (_profileLimiter ??= buildLimiter(30, "profile"));
 const getTaskLimiter = () => (_taskLimiter ??= buildLimiter(60, "task"));
 const getAdminLimiter = () => (_adminLimiter ??= buildLimiter(60, "admin"));
+const getStripeLimiter = () => (_stripeLimiter ??= buildLimiter(30, "stripe"));
+const getWebhookLimiter = () => (_webhookLimiter ??= buildLimiter(200, "webhook"));
 
 // ─── In-memory fallback ──────────────────────────────────────────────────────
 
@@ -38,6 +43,8 @@ const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const profileRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const taskRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const adminRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const stripeRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const webhookRateLimitMap = new Map<string, { count: number; resetAt: number }>();
 
 function checkInMemory(
   map: Map<string, { count: number; resetAt: number }>,
@@ -105,6 +112,28 @@ export async function isAdminRateLimited(
     return !success;
   }
   return checkInMemory(adminRateLimitMap, key, 60);
+}
+
+export async function isStripeRateLimited(
+  ip: string,
+  endpoint: string
+): Promise<boolean> {
+  const limiter = getStripeLimiter();
+  const key = `${ip}:${endpoint}`;
+  if (limiter) {
+    const { success } = await limiter.limit(key);
+    return !success;
+  }
+  return checkInMemory(stripeRateLimitMap, key, 30);
+}
+
+export async function isWebhookRateLimited(ip: string): Promise<boolean> {
+  const limiter = getWebhookLimiter();
+  if (limiter) {
+    const { success } = await limiter.limit(ip);
+    return !success;
+  }
+  return checkInMemory(webhookRateLimitMap, ip, 200);
 }
 
 export function isValidOrigin(request: NextRequest): boolean {

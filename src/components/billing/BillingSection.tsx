@@ -15,6 +15,7 @@ export function BillingSection() {
   const { subscription, loading, error, isPro, isCanceled, isPastDue } =
     useSubscription(user?.id);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [portalError, setPortalError] = useState<string | null>(null);
 
   const handleManageBilling = async () => {
     setPortalLoading(true);
@@ -34,6 +35,7 @@ export function BillingSection() {
       }
     } catch (err) {
       console.error("Billing portal error:", err);
+      setPortalError("Failed to open billing portal. Please try again.");
     } finally {
       setPortalLoading(false);
     }
@@ -139,15 +141,22 @@ export function BillingSection() {
         {/* Actions */}
         <div className="flex flex-wrap gap-3 pt-1">
           {isPro || isCanceled ? (
-            <Button
-              onClick={handleManageBilling}
-              disabled={portalLoading}
-              variant="outline"
-              className="border-[#DAC0FF] font-body text-sm text-[#5b57a2] hover:bg-[#F6F0FF]"
-            >
-              <ExternalLink className="mr-2 size-4" aria-hidden="true" />
-              {portalLoading ? "Loading..." : "Manage subscription"}
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={handleManageBilling}
+                disabled={portalLoading}
+                variant="outline"
+                className="border-[#DAC0FF] font-body text-sm text-[#5b57a2] hover:bg-[#F6F0FF]"
+              >
+                <ExternalLink className="mr-2 size-4" aria-hidden="true" />
+                {portalLoading ? "Loading..." : "Manage subscription"}
+              </Button>
+              {portalError && (
+                <p className="font-body text-sm text-red-600" role="alert">
+                  {portalError}
+                </p>
+              )}
+            </div>
           ) : (
             <Link href="/pricing">
               <Button className="bg-[#B580FF] font-body text-sm font-semibold text-white hover:bg-[#5b57a2]">

@@ -121,6 +121,7 @@ export function PricingCards({ currentPlan }: PricingCardsProps) {
   const router = useRouter();
   const { user } = useAuth();
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const handleFreePlan = () => {
     if (!user) {
@@ -137,6 +138,7 @@ export function PricingCards({ currentPlan }: PricingCardsProps) {
     }
 
     setCheckoutLoading(true);
+    setCheckoutError(null);
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -154,13 +156,22 @@ export function PricingCards({ currentPlan }: PricingCardsProps) {
       }
     } catch (err) {
       console.error("Checkout error:", err);
+      setCheckoutError(
+        err instanceof Error ? err.message : "Failed to start checkout. Please try again."
+      );
     } finally {
       setCheckoutLoading(false);
     }
   };
 
   return (
-    <div className="mx-auto grid max-w-4xl gap-6 sm:grid-cols-2">
+    <div className="mx-auto max-w-4xl space-y-4">
+      {checkoutError && (
+        <p className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-center font-body text-sm text-red-700" role="alert">
+          {checkoutError}
+        </p>
+      )}
+    <div className="grid gap-6 sm:grid-cols-2">
       <PricingCard
         name="Free"
         price="$0"
@@ -183,6 +194,7 @@ export function PricingCards({ currentPlan }: PricingCardsProps) {
         badge="Most Popular"
         currentPlan={currentPlan === "pro"}
       />
+    </div>
     </div>
   );
 }
