@@ -1,8 +1,8 @@
 # PROJ-5: Admin Panel
 
-## Status: In Review
+## Status: Deployed
 **Created:** 2026-03-20
-**Last Updated:** 2026-03-27
+**Last Updated:** 2026-04-05
 
 ## Dependencies
 - Requires: PROJ-1 (User Authentication) — admin must be authenticated

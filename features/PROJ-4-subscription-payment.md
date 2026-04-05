@@ -1,6 +1,6 @@
 # PROJ-4: Subscription & Payment (Freemium)
 
-## Status: In Review
+## Status: Deployed
 **Created:** 2026-03-20
 **Last Updated:** 2026-04-05
 
@@ -154,4 +154,10 @@ UpgradePrompt (Modal – überall einsetzbar)
 - `useSubscription` hook updated: removed `stripeCustomerId`/`stripeSubscriptionId`, added `cancelAtPeriodEnd`; `isCanceled` now reflects the new field
 
 ## Deployment
-_To be added by /deploy_
+
+**Deployed:** 2026-04-05
+**Production URL:** https://my-first-app-lac-ten.vercel.app
+**Platform:** Vercel (auto-deploy from `main` branch)
+**Supabase Migrations applied:**
+- `create_subscriptions` — subscriptions table with RLS
+- `fix_subscriptions_cancel_at_period_end` — cancel_at_period_end column

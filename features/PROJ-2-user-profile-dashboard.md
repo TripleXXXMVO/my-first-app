@@ -1,8 +1,8 @@
 # PROJ-2: User Profile & Dashboard
 
-## Status: In Review
+## Status: Deployed
 **Created:** 2026-03-20
-**Last Updated:** 2026-03-23
+**Last Updated:** 2026-04-05
 
 ## Dependencies
 - Requires: PROJ-1 (User Authentication) — user must be logged in
