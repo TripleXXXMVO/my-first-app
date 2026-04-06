@@ -46,7 +46,9 @@ export async function GET(request: Request) {
       type: type as EmailOtpType,
     });
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      // Add ?verified=1 so the dashboard can show a success message
+      const redirectPath = type === "signup" ? `${next}?verified=1` : next;
+      return NextResponse.redirect(`${origin}${redirectPath}`);
     }
   }
 
